@@ -180,7 +180,21 @@ instructions:
 | SEMICOLON l = instructions    { l }
 | i = instruction l = instructions { i::l }
 ;
+(*
+instructionOption:
+| SEMICOLON { None }
+| i = instruction { Some i }
  
+Attention : on a le droit d'après les spécifications aux instructions
+  IF (expr) instruction ELSE SEMICOLON qui équivaut à IF (expr) instruction
+  et
+  FOR (expr? ; expr? ; expr?) SEMICOLON
+  Donc deux solutions impliquant une modif de l'Ast sont possibles :
+  - ajout comme suggéré par la grammaire d'une instruction vide
+  (beaucoup plus simple à gérer au niveau du parser)
+  - modif de For pour prendre un Instr option au lieu d'un Instr
+
+*)
 instruction:
 | e = expr SEMICOLON { Expr e }
 | t = typ id = IDENT e = option (preceded (EQ, expr)) SEMICOLON
@@ -188,6 +202,7 @@ instruction:
 | IF LP e = expr RP
     i1 = instruction
     i2 = option (preceded (ELSE , instruction))
+(* à modifier : ne gère pas le cas IF (expr) instruction ELSE SEMICOLON *)
     { If (e , i1 , i2) }
 | FOR	LP
 		e1 = expr? SEMICOLON
@@ -195,6 +210,7 @@ instruction:
 		e3 = expr?
 	RP
 	i = instruction
+(* à modifier : ne gère pas le cas FOR (expr? ; expr? ; expr?) SEMICOLON *)
     { For (e1 , e2 , e3 , i) }
 | LB l = instructions RB { Block l }
 | RETURN e = expr? { Return e }
