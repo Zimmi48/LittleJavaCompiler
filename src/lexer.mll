@@ -53,9 +53,9 @@ rule token = parse
   | '<'     { LT }
   | '>'     { GT }
   | '!'     { POINTDEXCLAMATION }
-  | '.'     { POINT }
-  | ','     { VIRGULE }
-  | ';'     { POINTVIRGULE }
+  | '.'     { DOT }
+  | ','     { COMMA }
+  | ';'     { SEMICOLON }
   | '+'     { PLUS }
   | '-'     { MINUS }
   | '*'     { TIMES }
