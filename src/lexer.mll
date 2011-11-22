@@ -75,7 +75,7 @@ rule token = parse
   | eof     { EOF }
   | _ as c  { raise (Lexing_error c) }
 
-rule string = shortest
+rule string = parse
   | '"'    { "" }
   | "\\\"" { "\"" ^ (string lexbuf) }
   | "\\n"  { "\n" ^ (string lexbuf) }
