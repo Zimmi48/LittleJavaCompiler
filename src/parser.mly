@@ -146,7 +146,9 @@ expr:
 | s = STRING_CST { Sconst (position () , s) }
 | TRUE           { Bconst (position () , true) }
 | FALSE          { Bconst (position () , false) }
-| THIS (* l'Ast ne gère pas ce type d'accès *)
+| THIS { Getval (position () , Var "this") }
+(* l'Ast ne gère pas ce type d'accès séparément. On le traite comme les autres
+   à l'environnement de faire la différence *)
 | NULL           { Null (position ()) }
 | LP e = expr RP { e }
 | a = acces      { Getval (position () , a) }
