@@ -1,6 +1,4 @@
 
-/* Analyseur syntaxique pour Arith */
-
 %{
   open Ast
 
@@ -36,8 +34,8 @@
 %token PLUSPLUS MINUSMINUS
 %token ISEQ NEQ LT LEQ GT GEQ AND OR
 %token POINTDEXCLAMATION (* changer ce nom pourri *)
-%token POINT
-%token VIRGULE POINTVIRGULE
+%token DOT
+%token COMMA SEMICOLON
 
 /* Définitions des priorités et associativités des tokens */
 
@@ -49,7 +47,7 @@
 %left PLUS MINUS
 %left TIMES DIV MOD
 %right uminus PLUSPLUS MINUSMINUS POINTDEXCLAMATION CAST
-%left POINT
+%left DOT
 
 
 /* Point d'entrée de la grammaire */
@@ -82,44 +80,46 @@ extends:
 ;
 
 decl:
-| t = typ id = IDENT POINTVIRGULE { Attr ( (t, id) , position () ) }
+| t = typ id = IDENT SEMICOLON { Attr ( (t, id) , position () ) }
 | c = constructeur { Const c }
 | m = methode { Method m }
 ;
 
 constructeur:
-| id = IDENT LP p = parametres? RP LB i = instructions RB
+| id = IDENT
+    LP p = separated_list(COMMA, parametre) RP LB i = instructions RB
     {
       { pos = position () ;
         returnType = Void ;
         name = id ;
-        params = (match p with None -> [] | Some l -> l) ;
+        params = l ;
         body = i }
     }
 ;
 
 methode:
-| t = typ id = IDENT LP p = parametres? RP LB i = instructions RB
+| t = typ id = IDENT
+    LP p = separated_list(COMMA, parametre) RP LB i = instructions RB
     {
       { pos = position () ;
         returnType = t ;
         name = id ;
-        params = (match p with None -> [] | Some l -> l) ;
+        params = p ;
         body = i }
     }
-| VOID id = IDENT LP p = parametres? RP LB i = instructions RB
+| VOID id = IDENT
+    LP p = separated_list(COMMA, parametre) RP LB i = instructions RB
     {
       { pos = position () ;
         returnType = Void ;
         name = id ;
-        params = (match p with None -> [] | Some l -> l) ;
+        params = p ;
         body = i }
     }
 ;
 
-parametres:
-| t = typ id = IDENT { [t, id] }
-| t = typ id = IDENT VIRGULE p = parametres { (t, id) :: p }
+parametre:
+t = typ id = IDENT { t, id }
 ;
 
 typ:
@@ -134,9 +134,11 @@ classe_Main:
 		LP t = typ IDENT LBRACKET RBRACKET RP
 		LB l = instructions RB
 	RB
-	{if cMain = "Main" & main = "main" & typ = C "String" then
+	{ if cMain = "Main" & main = "main" & typ = C "String" then
 	 	l
 	 else failwith "Erreur parser: classe_Main"}
+(* un moyen de ne parser que les cas qui nous intéressent serait plus
+   cohérent avec une manière centralisée de gérer les erreurs de parsage *)
 ;
 
 expr:
@@ -149,16 +151,16 @@ expr:
 | LP e = expr RP { e }
 | a = acces      { Getval (position () , a) }
 | a = acces EQ e = expr { Assign (position () , a , e) }
-| a = acces LP l = l_expr? RP
-    { Call (position () , a , match l with None -> [] | Some l -> l) }
-| NEW id = IDENT LP l = l_expr? RP
-    { New (position () , id , match l with None -> [] | Some l -> l) }
+| a = acces LP l = separated_list(COMMA, expr) RP
+    { Call (position () , a , l) }
+| NEW id = IDENT LP l = separated_list(COMMA, expr) RP
+    { New (position () , id , l) }
 | PLUSPLUS e = expr   { Prefix (position () , PrefixIncr , e) }
-(* Est-il vraiment nécessaire de différencier les opérateurs préfixes, infixes,
- postfixes dans l'Ast ? Dans ce cas Incr ne peut pas être à la fois une valeur
- de type prefix et postfix. Il me paraît de toute façon plus judicieux de se 
- contenter de différencier les opérateurs en fonction de leur arité (unaire,
- binaire) *)
+(* Est-il vraiment nécessaire de différencier les opérateurs préfixes,
+   infixes, postfixes dans l'Ast ? Dans ce cas Incr ne peut pas être à
+   la fois une valeur de type prefix et postfix. Il me paraît de toute
+   façon plus judicieux de se contenter de différencier les opérateurs
+   en fonction de leur arité (unaire, binaire) *)
 | MINUSMINUS e = expr
 | e = expr PLUSPLUS
 | e = expr MINUSMINUS
@@ -173,68 +175,51 @@ expr:
 
 instructions:
 | i = instruction	           { [i] }
-| i = instruction l = instructions { match i with
-					| None -> l
-					| Some i -> i::l }
+| SEMICOLON l = instructions    { l }
+| i = instruction l = instructions { i::l }
 ;
  
 instruction:
-| POINTVIRGULE { None }
-| e = expr POINTVIRGULE { e }
-| t = typ id = IDENT POINTVIRGULE {  }
-| t = typ id = IDENT EQ e = expr POINTVIRGULE {  }
-| IF LP e = expr RP i = instruction { }
-| IF LP e = expr RP i1 = instruction ELSE instruction { }
+| e = expr SEMICOLON { Expr e }
+| t = typ id = IDENT e = option (preceded (EQ, expr)) SEMICOLON
+    { Decl (position () , t , id , e) }
+| IF LP e = expr RP
+    i1 = instruction
+    i2 = option (preceded (ELSE , instruction))
+    { If (e , i1 , i2) }
 | FOR	LP
-		e1 = expr? POINTVIRGULE
-		e2 = expr? POINTVIRGULE
+		e1 = expr? SEMICOLON
+		e2 = expr? SEMICOLON
 		e3 = expr?
 	RP
-	i = instruction (* expr ? *)
-| LB l = instructions RB
-| RETURN e = expr? (* expr ? *)
+	i = instruction
+    { For (e1 , e2 , e3 , i) }
+| LB l = instructions RB { Block l }
+| RETURN e = expr? { Return e }
 ;
- 
-l_expr:
-| e = expr
-| e = expr VIRGULE l = l_expr
-;
-
-(*
-l_expr?:
-| l = l_expr { Some l }
-| { None }
-;
-*)
 
 acces:
-| id = IDENT
-| e = expr POINT id = IDENT
+| id = IDENT { Var id }
+| e = expr DOT id = IDENT { Attr (e , id) }
+(* Attr me paraît être un mauvais nom car il ne montre pas qu'il s'agît
+   d'accéder à une méthode ou un attribut d'un objet
+   De même pourquoi préférer le nom vars à acces *)
 ;
 
-operateur:
-| ISEQ
-| NEQ
-| LT
-| LEQ
-| GT
-| GEQ
-| PLUS
-| MINUS
-| TIMES
-| DIV
-| MOD
-| AND
-| OR
+%inline operateur:
+| ISEQ { Eq }
+| NEQ { Neq }
+| LT { Lt }
+| LEQ { Leq }
+| GT { Gt }
+| GEQ { Geq }
+| PLUS { Plus }
+| MINUS { Minus }
+| TIMES { Star }
+| DIV { Div }
+| MOD { Mod }
+| AND { And }
+| OR { Or }
 ;
-
-(*
-%inline op:
-| PLUS  { Add }
-| MINUS { Sub }
-| TIMES { Mul }
-| DIV   { Div }
-;
-*)
 
 
