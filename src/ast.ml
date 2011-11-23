@@ -20,23 +20,18 @@ type types =
   | Int
   | C of string 
 
-(** Opérateurs infixes sur les expressions *)
-type infix =
+(** Opérateurs binaires (toujours infixes) sur les expressions *)
+type binaire =
   | Eq | Neq | Leq | Geq | Lt | Gt 
   | Plus | Minus | Star | Div 
   | Mod 
   | And | Or
     
-(** Opérateurs préfixés sur les expressions *)
-type prefix =
+(** Opérateurs unaires sur les expressions *)
+type unaire =
   | Incr | Decr
   | Not
-  | Minus
-      
-(** Opérateurs postfixés sur les expressions *)
-type postfix =
-  | Incr
-  | Decr
+  | UMinus
     
 (** Appels à des variables, méthodes, et attributs *)
 type vars =
@@ -49,9 +44,8 @@ and expr =
   | Sconst of pos * string
   | Bconst of pos * bool
   | Null of pos
-  | Prefix of pos * prefix * expr
-  | Postfix of pos *postfix * expr
-  | Infix of pos * infix * expr * expr
+  | Unaire of pos * unaire * expr
+  | Binaire of pos * binaire * expr * expr
   (** caste l'expression *)
   | Cast of pos * types * expr
   (** assigne expr *)
@@ -75,7 +69,7 @@ type instruction  =
   (** Branchement conditionnel, s'il y a une clause "else", elle se trouve dans le paramètre optionnel *)
   | If of  expr * instruction * instruction option
   (**Boucle for, sémantique classique *)
-  | For of expr option * expr option * expr option * instruction
+  | For of expr option * expr option * expr option * instruction option
   | Block of instruction list
   (** Expression optionnelles, pour les méthodes void *)
   | Return of expr option
@@ -84,24 +78,24 @@ type instruction  =
 type variable = types * ident
 (** les méthodes et constructeurs *)
 type callable = {
-  pos : pos;
-  returnType : types;
-  name : ident;
-  params : variable list;
-  body : instruction list;
+  call_pos : pos;
+  call_returnType : types;
+  call_name : ident;
+  call_params : variable list;
+  call_body : instruction list;
 }
     
 (** représentation d'une classe *)
 type classe = {
-  pos : pos ;
+  class_pos : pos ;
   (** Le nom de la classe*)
-  name : ident ;
+  class_name : ident ;
   (** Liste des relations d'héritages *)
-  extends : (ident * pos) list;
+  class_extends : (ident * pos) option;
   (** Les attributs, sous forme de paires *)
-  attrs : (variable * pos) list;
+  class_attrs : (variable * pos) list;
   (** les constructeurs (ils peuvent être surchargés), le champ returnType est toujours nul*)
-  const : callable list;
+  class_consts : callable list;
   (** la liste des méthodes, pouvant avoir des noms identiques *)
-  methods : callable list;
+  class_methods : callable list;
 }

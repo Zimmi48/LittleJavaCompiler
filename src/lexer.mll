@@ -41,6 +41,9 @@ let space = [' ' '\t']
 rule token = parse
   | '\n'    { newline lexbuf; token lexbuf }
   | space+  { token lexbuf }
+  | "class" space+ "Main" space+ '{' space+ "public" space+ "static" space+
+      "void" space+ "main" space* '(' space* "String" space+ ident space* '['
+      space* ']' space* ')' { CLASSMAIN }
   | ident as id { id_or_kwd id }
   | "++"    { PLUSPLUS }
   | "--"    { MINUSMINUS }
@@ -66,8 +69,6 @@ rule token = parse
   | ')'     { RP }
   | '{'     { LB }
   | '}'     { RB }
-  | '['     { LBRACKET }
-  | ']'     { RBRACKET }
   | integer as s { INT_CST (int_of_string s) }
   | '"'     { STRING_CST (string lexbuf) }
   | "//"    { commentLine lexbuf ; token lexbuf }
