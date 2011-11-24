@@ -76,17 +76,17 @@ rule token = parse
   | eof     { EOF }
   | _ as c  { raise (Lexing_error c) }
 
-rule string = parse
+and string = parse
   | '"'    { "" }
   | "\\\"" { "\"" ^ (string lexbuf) }
   | "\\n"  { "\n" ^ (string lexbuf) }
-  | _ as s { s ^ (string lexbuf) }
+  | _ as s { String.make 1 s ^ (string lexbuf) }
 
-rule commentLine = parse
+and commentLine = parse
   | '\n' { newline lexbuf }
   | _    { comment lexbuf }
 
-rule comment = parse
+and comment = parse
   | '\n' { newline lexbuf ; comment lexbuf }
   | "*/" { () }
   | _    { comment lexbuf }

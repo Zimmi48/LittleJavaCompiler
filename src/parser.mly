@@ -1,12 +1,14 @@
 
 %{
   open Ast
+  open Lexing
 
-  let position () = (* actuellement on se prive de certaines infos *)
-    { file = "" (*startpos.pos_fname*) ;
-      line = 0 (*startpos.pos_lnum*) ;
-      fChar = 0 (*startpos.pos_cnum*) ;
-      lChar = 0 (*endpos.pos_cnum*) }
+  let position startpos endpos =
+    (* actuellement on se prive de certaines infos *)
+    { file = startpos.pos_fname ;
+      line = startpos.pos_lnum ;
+      fChar = startpos.pos_cnum ;
+      lChar = endpos.pos_cnum }
 
   type decl = | Attribut of variable * pos
               | Const of callable
@@ -53,7 +55,6 @@
 %right uminus PLUSPLUS MINUSMINUS POINTDEXCLAMATION cast
 %left DOT
 
-
 /* Point d'entrée de la grammaire */
 %start fichier
 
@@ -71,7 +72,7 @@ classe:
     {
       let a, c, m = attrsAndConstsAndMethods_of_decls d in
       {
-        class_pos = position() ;
+        class_pos = position $startpos $endpos ;
         class_name = id ;
         class_extends =  e ;
         class_attrs = a ;
@@ -81,11 +82,11 @@ classe:
 ;
 
 extends:
-  LP EXTENDS id = IDENT RP { id , position () }
+  LP EXTENDS id = IDENT RP { id , position $startpos $endpos }
 ;
 
 decl:
-| t = typ id = IDENT SEMICOLON { Attribut ( (t, id) , position () ) }
+| t = typ id = IDENT SEMICOLON { Attribut ( (t, id) , position $startpos $endpos ) }
 | c = constructeur { Const c }
 | m = methode { Method m }
 ;
@@ -94,7 +95,7 @@ constructeur:
 | id = IDENT
     LP p = separated_list(COMMA, parametre) RP LB i = instructions RB
     {
-      { call_pos = position () ;
+      { call_pos = position $startpos $endpos ;
         call_returnType = Void ;
         call_name = id ;
         call_params = p ;
@@ -106,7 +107,7 @@ methode:
 | t = typ id = IDENT
     LP p = separated_list(COMMA, parametre) RP LB i = instructions RB
     {
-      { call_pos = position () ;
+      { call_pos = position $startpos $endpos ;
         call_returnType = t ;
         call_name = id ;
         call_params = p ;
@@ -115,7 +116,7 @@ methode:
 | VOID id = IDENT
     LP p = separated_list(COMMA, parametre) RP LB i = instructions RB
     {
-      { call_pos = position () ;
+      { call_pos = position $startpos $endpos ;
         call_returnType = Void ;
         call_name = id ;
         call_params = p ;
@@ -127,9 +128,12 @@ parametre:
 t = typ id = IDENT { t, id }
 ;
 
-typ:
+typNonIdent:
 | BOOLEAN    { Bool }
 | INT        { Int }
+
+typ:
+| t = typNonIdent { t }
 | id = IDENT { C id }
 ;
 
@@ -137,31 +141,43 @@ classe_Main:
 CLASSMAIN LB l = instructions RB RB { l }
 ;
 
-expr:
-| i = INT_CST    { Iconst (position () , i) }
-| s = STRING_CST { Sconst (position () , s) }
-| TRUE           { Bconst (position () , true) }
-| FALSE          { Bconst (position () , false) }
-| THIS { Getval (position () , Var "this") }
+exprNonIdent:
+| i = INT_CST    { Iconst (position $startpos $endpos , i) }
+| s = STRING_CST { Sconst (position $startpos $endpos , s) }
+| TRUE           { Bconst (position $startpos $endpos , true) }
+| FALSE          { Bconst (position $startpos $endpos , false) }
+| THIS { Getval (position $startpos $endpos , Var "this") }
 (* l'Ast ne gère pas ce type d'accès séparément. On le traite comme les autres
    à l'environnement de faire la différence *)
-| NULL           { Null (position ()) }
-| LP e = expr RP { e }
-| a = acces      { Getval (position () , a) }
-| a = acces EQ e = expr { Assign (position () , a , e) }
+| NULL           { Null (position $startpos $endpos) }
+| a = accesNonIdent { Getval (position $startpos $endpos , a) }
+| a = acces EQ e = expr { Assign (position $startpos $endpos , a , e) }
 | a = acces LP l = separated_list(COMMA, expr) RP
-    { Call (position () , a , l) }
+    { Call (position $startpos $endpos , a , l) }
 | NEW id = IDENT LP l = separated_list(COMMA, expr) RP
-    { New (position () , id , l) }
-| PLUSPLUS e = expr | e = expr PLUSPLUS { Unaire (position () , Incr , e) }
-| MINUSMINUS e = expr | e = expr MINUSMINUS { Unaire (position () , Decr , e) }
-| POINTDEXCLAMATION e = expr  { Unaire (position () , Not , e) }
-
-| MINUS e = expr %prec uminus { Unaire (position () , UMinus, e) }
-| e1 = expr op = operateur e2 = expr { Binaire (position () , op , e1 , e2) }
-| LP t = typ RP e = expr %prec cast { Cast (position () , t , e) }
-| e = expr INSTANCEOF t = typ { Instanceof (position () , e , t) }
+    { New (position $startpos $endpos , id , l) }
+| PLUSPLUS e = expr | e = expr PLUSPLUS
+    { Unaire (position $startpos $endpos , Incr , e) }
+| MINUSMINUS e = expr | e = expr MINUSMINUS
+    { Unaire (position $startpos $endpos , Decr , e) }
+| POINTDEXCLAMATION e = expr  { Unaire (position $startpos $endpos , Not , e) }
+| MINUS e = expr %prec uminus
+    { Unaire (position $startpos $endpos , UMinus, e) }
+| e1 = expr op = operateur e2 = expr
+    { Binaire (position $startpos $endpos , op , e1 , e2) }
+| e = expr INSTANCEOF t = typ
+    { Instanceof (position $startpos $endpos , e , t) }
+| LP id = IDENT RP e = exprSansDebutParOp %prec cast
+    { Cast (position $startpos $endpos , C id , e) }
+| LP id = IDENT RP { Getval (position $startpos(id) $endpos(id), Var id) }
+| LP e = exprNonIdent RP { e }
+| LP t = typNonIdent RP e = expr %prec cast
+    { Cast (position $startpos $endpos , t , e) }
 ;
+
+expr:
+| e = exprNonIdent { e }
+| id = IDENT { Getval (position $startpos $endpos, Var id) }
 
 instructions:
 | i = instruction	           { [i] }
@@ -192,7 +208,7 @@ instructionSansFinParIfSoloOption:
 instructionSansFinParIfSolo:
 | e = expr SEMICOLON { Expr e }
 | t = typ id = IDENT e = option (preceded (EQ, expr)) SEMICOLON
-    { Decl (position () , t , id , e) }
+    { Decl (position $startpos $endpos , t , id , e) }
 | IF LP e = expr RP
     i1 = instructionSansFinParIfSolo
     ELSE i2 = instructionSansFinParIfSoloOption
@@ -208,10 +224,13 @@ instructionSansFinParIfSolo:
 | RETURN e = expr? SEMICOLON { Return e }
 ;
 
-acces:
-| id = IDENT { Var id }
-| e = expr DOT id = IDENT { Attr (e , id) }
+accesNonIdent:
+e = expr DOT id = IDENT { Attr (e , id) }
 ;
+
+acces:
+| a = accesNonIdent { a }
+| id = IDENT { Var id }
 
 %inline operateur:
 | ISEQ { Eq }
