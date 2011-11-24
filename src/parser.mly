@@ -53,8 +53,6 @@
 %right uminus PLUSPLUS MINUSMINUS POINTDEXCLAMATION cast
 %left DOT
 
-%nonassoc ifsolo
-%nonassoc ifelse
 
 /* Point d'entrée de la grammaire */
 %start fichier
@@ -158,6 +156,7 @@ expr:
 | PLUSPLUS e = expr | e = expr PLUSPLUS { Unaire (position () , Incr , e) }
 | MINUSMINUS e = expr | e = expr MINUSMINUS { Unaire (position () , Decr , e) }
 | POINTDEXCLAMATION e = expr  { Unaire (position () , Not , e) }
+
 | MINUS e = expr %prec uminus { Unaire (position () , UMinus, e) }
 | e1 = expr op = operateur e2 = expr { Binaire (position () , op , e1 , e2) }
 | LP t = typ RP e = expr %prec cast { Cast (position () , t , e) }
@@ -170,40 +169,43 @@ instructions:
 | i = instruction l = instructions { i::l }
 ;
 
-instructionOption:
-| SEMICOLON { None }
-| i = instruction { Some i }
- 
-(*Attention : on a le droit d'après les spécifications aux instructions
-  IF (expr) instruction ELSE SEMICOLON qui équivaut à IF (expr) instruction
-  et
-  FOR (expr? ; expr? ; expr?) SEMICOLON
-  Donc deux solutions impliquant une modif de l'Ast sont possibles :
-  - ajout comme suggéré par la grammaire d'une instruction vide
-  (beaucoup plus simple à gérer au niveau du parser)
-  - modif de For pour prendre un Instr option au lieu d'un Instr
-
-*)
 instruction:
+| i = instructionSansFinParIfSolo { i }
+| IF LP e = expr RP
+    i = instructionSansFinParIfSolo
+    { If (e , i , None) }
+| FOR	LP
+		e1 = expr? SEMICOLON
+		e2 = expr? SEMICOLON
+		e3 = expr?
+	RP
+	IF LP e = expr RP
+                i = instructionSansFinParIfSolo
+    { For (e1 , e2 , e3 , Some (If (e , i , None))) }
+;
+
+instructionSansFinParIfSoloOption:
+| SEMICOLON { None }
+| i = instructionSansFinParIfSolo { Some i }
+;
+
+instructionSansFinParIfSolo:
 | e = expr SEMICOLON { Expr e }
 | t = typ id = IDENT e = option (preceded (EQ, expr)) SEMICOLON
     { Decl (position () , t , id , e) }
 | IF LP e = expr RP
-    i = instruction %prec ifsolo
-    { If (e , i , None) }
-| IF LP e = expr RP
-    i1 = instruction
-    ELSE i2 = instructionOption %prec ifelse
+    i1 = instructionSansFinParIfSolo
+    ELSE i2 = instructionSansFinParIfSoloOption
     { If (e , i1 , i2) }
 | FOR	LP
 		e1 = expr? SEMICOLON
 		e2 = expr? SEMICOLON
 		e3 = expr?
 	RP
-	i = instructionOption
+	i = instructionSansFinParIfSoloOption
     { For (e1 , e2 , e3 , i) }
 | LB l = instructions RB { Block l }
-| RETURN e = expr? { Return e }
+| RETURN e = expr? SEMICOLON { Return e }
 ;
 
 acces:
