@@ -2,6 +2,8 @@
 %{
   open Ast
   open Lexing
+  
+  exception PasUnAcces of pos
 
   let position startpos endpos =
     (* actuellement on se prive de certaines infos *)
@@ -45,15 +47,12 @@
 
 /* Définitions des priorités et associativités des tokens */
 
-%right EQ
 %left OR
 %left AND
 %left ISEQ NEQ
 %left LT LEQ GT GEQ INSTANCEOF
 %left PLUS MINUS
 %left TIMES DIV MOD
-%right uminus PLUSPLUS MINUSMINUS POINTDEXCLAMATION cast
-%left DOT
 
 /* Point d'entrée de la grammaire */
 %start fichier
@@ -128,20 +127,93 @@ parametre:
 t = typ id = IDENT { t, id }
 ;
 
-typNonIdent:
-| BOOLEAN    { Bool }
-| INT        { Int }
-
-typ:
-| t = typNonIdent { t }
-| id = IDENT { C id }
-;
-
 classe_Main:
 CLASSMAIN LB l = instructions RB RB { l }
 ;
 
+typNatif:
+| BOOLEAN    { Bool }
+| INT        { Int }
+
+typ:
+| t = typNatif { t }
+| id = IDENT { C id }
+;
+
+%inline opInfix:
+| ISEQ { Eq }
+| NEQ { Neq }
+| LT { Lt }
+| LEQ { Leq }
+| GT { Gt }
+| GEQ { Geq }
+| PLUS { Plus }
+| MINUS { Minus }
+| TIMES { Star }
+| DIV { Div }
+| MOD { Mod }
+| AND { And }
+| OR { Or }
+;
+
+opPrefPost:
+| PLUSPLUS { Incr }
+| MINUSMINUS { Decr }
+;
+
+(* Définition recoupée en nombreux non terminaux des expressions *)
 exprNonIdent:
+| a = sousExpr EQ e = expr { match a with
+    | Getval (_, a) -> Assign (position $startpos $endpos , a , e)
+    | _ -> raise (PasUnAcces (position $startpos $endpos)) }
+| a = sousExpr LP l = separated_list(COMMA, expr) RP
+    {  match a with
+      | Getval (_, a) -> Call (position $startpos $endpos , a , l)
+      | _ -> raise (PasUnAcces (position $startpos $endpos)) }
+| NEW id = IDENT LP l = separated_list(COMMA, expr) RP
+    { New (position $startpos $endpos , id , l) }
+| e = sousExpr { e }
+;
+
+expr:
+| e = exprNonIdent { e }
+| id = IDENT { Getval (position $startpos $endpos , Var id) }
+;
+
+sousExpr: (* privé du cas <ident> *)
+| e1 = sousExpr op = opInfix e2 = sousExpr
+    { Binaire (position $startpos $endpos , op , e1 , e2) }
+| e = sousExpr INSTANCEOF t = typ
+    { Instanceof (position $startpos $endpos , e , t) }
+| f = facteur { f }
+;
+
+facteurLimite:
+| LP t = typNatif RP f = facteur
+    { Cast (position $startpos $endpos , t , f) }
+| LP id = IDENT RP op = opPrefPost f = facteur
+    { Cast (position $startpos $endpos , C id ,
+            Unaire (position $startpos(op) $endpos(op) , op , f) ) }
+| LP id = IDENT RP op = opPrefPost
+    { Unaire (position $startpos $endpos , op ,
+              Getval (position $startpos(id) $endpos(id) , Var id)) }
+| a = atome op = opPrefPost
+    { Unaire (position $startpos $endpos , op , a) }
+| LP id = IDENT RP { Getval (position $startpos $endpos , Var id) }
+| a = atome { a }
+| LP id = IDENT RP f = facteurLimite
+    { Cast (position $startpos $endpos , C id , f) }
+| POINTDEXCLAMATION f = facteur
+    { Unaire (position $startpos $endpos , Not , f) }
+;
+
+facteur: (* privé du cas <ident> *)
+| MINUS f = facteur { Unaire (position $startpos $endpos , UMinus , f) }
+| op = opPrefPost f = facteur { Unaire (position $startpos $endpos , op , f) }
+| f = facteurLimite { f }
+;
+
+atome: (* privé du cas LP <ident> RP et du cas <ident> *)
 | i = INT_CST    { Iconst (position $startpos $endpos , i) }
 | s = STRING_CST { Sconst (position $startpos $endpos , s) }
 | TRUE           { Bconst (position $startpos $endpos , true) }
@@ -150,34 +222,10 @@ exprNonIdent:
 (* l'Ast ne gère pas ce type d'accès séparément. On le traite comme les autres
    à l'environnement de faire la différence *)
 | NULL           { Null (position $startpos $endpos) }
-| a = accesNonIdent { Getval (position $startpos $endpos , a) }
-| a = acces EQ e = expr { Assign (position $startpos $endpos , a , e) }
-| a = acces LP l = separated_list(COMMA, expr) RP
-    { Call (position $startpos $endpos , a , l) }
-| NEW id = IDENT LP l = separated_list(COMMA, expr) RP
-    { New (position $startpos $endpos , id , l) }
-| PLUSPLUS e = expr | e = expr PLUSPLUS
-    { Unaire (position $startpos $endpos , Incr , e) }
-| MINUSMINUS e = expr | e = expr MINUSMINUS
-    { Unaire (position $startpos $endpos , Decr , e) }
-| POINTDEXCLAMATION e = expr  { Unaire (position $startpos $endpos , Not , e) }
-| MINUS e = expr %prec uminus
-    { Unaire (position $startpos $endpos , UMinus, e) }
-| e1 = expr op = operateur e2 = expr
-    { Binaire (position $startpos $endpos , op , e1 , e2) }
-| e = expr INSTANCEOF t = typ
-    { Instanceof (position $startpos $endpos , e , t) }
-| LP id = IDENT RP e = exprSansDebutParOp %prec cast
-    { Cast (position $startpos $endpos , C id , e) }
-| LP id = IDENT RP { Getval (position $startpos(id) $endpos(id), Var id) }
+| a = atome DOT id = IDENT
+    { Getval (position $startpos $endpos , Attr (a , id)) }
 | LP e = exprNonIdent RP { e }
-| LP t = typNonIdent RP e = expr %prec cast
-    { Cast (position $startpos $endpos , t , e) }
 ;
-
-expr:
-| e = exprNonIdent { e }
-| id = IDENT { Getval (position $startpos $endpos, Var id) }
 
 instructions:
 | i = instruction	           { [i] }
@@ -223,29 +271,3 @@ instructionSansFinParIfSolo:
 | LB l = instructions RB { Block l }
 | RETURN e = expr? SEMICOLON { Return e }
 ;
-
-accesNonIdent:
-e = expr DOT id = IDENT { Attr (e , id) }
-;
-
-acces:
-| a = accesNonIdent { a }
-| id = IDENT { Var id }
-
-%inline operateur:
-| ISEQ { Eq }
-| NEQ { Neq }
-| LT { Lt }
-| LEQ { Leq }
-| GT { Gt }
-| GEQ { Geq }
-| PLUS { Plus }
-| MINUS { Minus }
-| TIMES { Star }
-| DIV { Div }
-| MOD { Mod }
-| AND { And }
-| OR { Or }
-;
-
-
