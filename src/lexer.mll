@@ -55,7 +55,7 @@ rule token = parse
   | "&&"    { AND }
   | '<'     { LT }
   | '>'     { GT }
-  | '!'     { POINTDEXCLAMATION }
+  | '!'     { NOT }
   | '.'     { DOT }
   | ','     { COMMA }
   | ';'     { SEMICOLON }

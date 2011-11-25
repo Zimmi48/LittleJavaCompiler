@@ -4,6 +4,7 @@
   open Lexing
   
   exception PasUnAcces of pos
+  exception PasUnType of pos
 
   let position startpos endpos =
     (* actuellement on se prive de certaines infos *)
@@ -40,7 +41,7 @@
 %token PLUS MINUS TIMES DIV MOD
 %token PLUSPLUS MINUSMINUS
 %token ISEQ NEQ LT LEQ GT GEQ AND OR
-%token POINTDEXCLAMATION (* changer ce nom pourri *)
+%token NOT
 %token DOT
 %token COMMA SEMICOLON
 %token CLASSMAIN (* on traite la classe Main à part *)
@@ -134,10 +135,21 @@ CLASSMAIN LB l = instructions RB RB { l }
 typNatif:
 | BOOLEAN    { Bool }
 | INT        { Int }
+;
 
 typ:
 | t = typNatif { t }
 | id = IDENT { C id }
+;
+
+(* Définition recoupée en nombreux non terminaux des expressions *)
+expr:
+| a = acces EQ e = expr { Assign (position $startpos $endpos , a , e) }
+| a = acces LP l = separated_list(COMMA, expr) RP
+    { Call (position $startpos $endpos , a , l) }
+| NEW id = IDENT LP l = separated_list(COMMA, expr) RP
+    { New (position $startpos $endpos , id , l) }
+| e = sousExpr { e }
 ;
 
 %inline opInfix:
@@ -156,31 +168,7 @@ typ:
 | OR { Or }
 ;
 
-opPrefPost:
-| PLUSPLUS { Incr }
-| MINUSMINUS { Decr }
-;
-
-(* Définition recoupée en nombreux non terminaux des expressions *)
-exprNonIdent:
-| a = sousExpr EQ e = expr { match a with
-    | Getval (_, a) -> Assign (position $startpos $endpos , a , e)
-    | _ -> raise (PasUnAcces (position $startpos $endpos)) }
-| a = sousExpr LP l = separated_list(COMMA, expr) RP
-    {  match a with
-      | Getval (_, a) -> Call (position $startpos $endpos , a , l)
-      | _ -> raise (PasUnAcces (position $startpos $endpos)) }
-| NEW id = IDENT LP l = separated_list(COMMA, expr) RP
-    { New (position $startpos $endpos , id , l) }
-| e = sousExpr { e }
-;
-
-expr:
-| e = exprNonIdent { e }
-| id = IDENT { Getval (position $startpos $endpos , Var id) }
-;
-
-sousExpr: (* privé du cas <ident> *)
+sousExpr:
 | e1 = sousExpr op = opInfix e2 = sousExpr
     { Binaire (position $startpos $endpos , op , e1 , e2) }
 | e = sousExpr INSTANCEOF t = typ
@@ -188,32 +176,27 @@ sousExpr: (* privé du cas <ident> *)
 | f = facteur { f }
 ;
 
+opPrefPost:
+| PLUSPLUS { Incr }
+| MINUSMINUS { Decr }
+;
+
 facteurLimite:
 | LP t = typNatif RP f = facteur
     { Cast (position $startpos $endpos , t , f) }
-| LP id = IDENT RP op = opPrefPost f = facteur
-    { Cast (position $startpos $endpos , C id ,
-            Unaire (position $startpos(op) $endpos(op) , op , f) ) }
-| LP id = IDENT RP op = opPrefPost
-    { Unaire (position $startpos $endpos , op ,
-              Getval (position $startpos(id) $endpos(id) , Var id)) }
-| a = atome op = opPrefPost
-    { Unaire (position $startpos $endpos , op , a) }
-| LP id = IDENT RP { Getval (position $startpos $endpos , Var id) }
-| a = atome { a }
-| LP id = IDENT RP f = facteurLimite
-    { Cast (position $startpos $endpos , C id , f) }
-| POINTDEXCLAMATION f = facteur
+| LP e = expr RP f = facteurLimite
+    { match e with
+      | Getval (_ , Var id) -> Cast (position $startpos $endpos , C id , f)
+      | _ -> raise (PasUnType (position $startpos $endpos)) }
+| LP e = expr RP { e }
+| f = atome op = opPrefPost | op = opPrefPost f = facteur
+    { Unaire (position $startpos $endpos , op , f) }
+| NOT f = facteur
     { Unaire (position $startpos $endpos , Not , f) }
+| a = atome { a }
 ;
 
-facteur: (* privé du cas <ident> *)
-| MINUS f = facteur { Unaire (position $startpos $endpos , UMinus , f) }
-| op = opPrefPost f = facteur { Unaire (position $startpos $endpos , op , f) }
-| f = facteurLimite { f }
-;
-
-atome: (* privé du cas LP <ident> RP et du cas <ident> *)
+atome:
 | i = INT_CST    { Iconst (position $startpos $endpos , i) }
 | s = STRING_CST { Sconst (position $startpos $endpos , s) }
 | TRUE           { Bconst (position $startpos $endpos , true) }
@@ -222,9 +205,20 @@ atome: (* privé du cas LP <ident> RP et du cas <ident> *)
 (* l'Ast ne gère pas ce type d'accès séparément. On le traite comme les autres
    à l'environnement de faire la différence *)
 | NULL           { Null (position $startpos $endpos) }
-| a = atome DOT id = IDENT
-    { Getval (position $startpos $endpos , Attr (a , id)) }
-| LP e = exprNonIdent RP { e }
+| a = acces { Getval (position $startpos $endpos , a) }
+;
+
+acces:
+| id = IDENT { Var id }
+| a = acces DOT id = IDENT
+    { Attr (Getval (position $startpos(a) $endpos(a) , a) , id) }
+| LP e = expr RP DOT id = IDENT
+    { Attr (e , id) }
+;
+
+facteur:
+| MINUS f = facteur { Unaire (position $startpos $endpos , UMinus , f) }
+| f = facteurLimite { f }
 ;
 
 instructions:
