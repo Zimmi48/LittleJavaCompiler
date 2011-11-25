@@ -1,6 +1,6 @@
 
 %{
-  open Ast
+  open Ast.Past
   open Lexing
   
   exception PasUnType of pos
@@ -58,12 +58,12 @@
 %start fichier
 
 /* Type des valeurs retournées par l'analyseur syntaxique */
-%type <Ast.classe list * Ast.instruction list> fichier
+%type <Ast.Past.prog> fichier
 
 %%
 
 fichier:
-l = classe* m = classe_Main EOF { l , m }
+l = classe* m = classe_Main EOF { { classes = l ; instr = m } }
 ;
 
 classe:
