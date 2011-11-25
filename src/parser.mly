@@ -3,7 +3,6 @@
   open Ast
   open Lexing
   
-  exception PasUnAcces of pos
   exception PasUnType of pos
 
   let position startpos endpos =
