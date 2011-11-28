@@ -180,19 +180,36 @@ opPrefPost:
 | MINUSMINUS { Decr }
 ;
 
-facteurLimite:
+facteurTresLimite:
 | LP t = typNatif RP f = facteur
     { Cast (position $startpos $endpos , t , f) }
-| LP e = expr RP f = facteurLimite
+| LP e = expr RP f = facteurTresLimite
     { match e with
       | Getval (_ , Var id) -> Cast (position $startpos $endpos , C id , f)
       | _ -> raise (PasUnType (position $startpos $endpos)) }
+| LP e = expr RP op = opPrefPost f = facteurLimite
+    { match e with
+      | Getval (_ , Var id) ->
+        Cast (position $startpos $endpos , C id ,
+              Unaire (position $startpos(f) $endpos(f) , op , f) )
+      | _ -> raise (PasUnType (position $startpos $endpos)) }
 | LP e = expr RP { e }
-| f = atome op = opPrefPost | op = opPrefPost f = facteur
+| f = atome op = opPrefPost | LP f = expr RP op = opPrefPost
     { Unaire (position $startpos $endpos , op , f) }
 | NOT f = facteur
     { Unaire (position $startpos $endpos , Not , f) }
 | a = atome { a }
+;
+
+facteurLimite:
+| op = opPrefPost f = facteur
+    { Unaire (position $startpos $endpos , op , f) }
+| f = facteurTresLimite { f }
+
+
+facteur:
+| MINUS f = facteur { Unaire (position $startpos $endpos , UMinus , f) }
+| f = facteurLimite { f }
 ;
 
 atome:
@@ -213,11 +230,6 @@ acces:
     { Attr (Getval (position $startpos(a) $endpos(a) , a) , id) }
 | LP e = expr RP DOT id = IDENT
     { Attr (e , id) }
-;
-
-facteur:
-| MINUS f = facteur { Unaire (position $startpos $endpos , UMinus , f) }
-| f = facteurLimite { f }
 ;
 
 instructions:
