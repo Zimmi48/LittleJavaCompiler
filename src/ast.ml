@@ -165,26 +165,28 @@ type vars =
   | Attr of expr * ident 
 
 (** Représente la grammaire des expressions, le premier paramètre de chaque constructeur est la position *)
-and expr = 
-  | Iconst of pos * int
-  | Sconst of pos * string
-  | Bconst of pos * bool
-  | Null of pos
-  | Unaire of pos * unaire * expr
-  | Binaire of pos * binaire * expr * expr
+and expr_v = 
+  | Iconst of pos * int 
+  | Sconst of pos * string 
+  | Bconst of pos * bool 
+  | Null of pos 
+  | Unaire of pos * unaire * expr 
+  | Binaire of pos * binaire * expr * expr 
   (** caste l'expression *)
-  | Cast of pos * types * expr
+  | Cast of pos * types * expr 
   (** assigne expr *)
-  | Assign of pos * vars * expr
+  | Assign of pos * vars * expr 
   (** Appel d'une méthode, les paramètres sont stockés dans la liste *)
-  | Call of pos * vars * expr list
+  | Call of pos * vars * expr list 
   (** Accès a une variable (au sens large) *)
-  | Getval of pos * vars  
+  | Getval of pos * vars 
   (** expression booléene, vrai si expr est une instance de types *)
-  | Instanceof of pos * expr * types
+  | Instanceof of pos * expr * types 
   (** opérateur d'instanciation de la classe ident
       les paramètres du constructeur sont pasés sous forme de liste *)
-  | New of pos * ident * expr list 
+  | New of pos * ident * expr list  
+
+and expr = { v : expr_v; t : types }
 
 (** Repérsente la grammaire des instructions *)
 type instruction  = 
