@@ -1,3 +1,4 @@
+
 (* Arbre de syntaxe abstraite *)
 
 (** Syntaxe issue du parsage *)
@@ -14,6 +15,9 @@ type pos = {
   fChar: int;
   lChar : int;
 }
+
+(** Exception à usage dans le parser *)
+  exception PasUnType of pos
 
 (** Les idents sont des chaines *)
 type ident = string

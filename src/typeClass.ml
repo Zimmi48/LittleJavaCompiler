@@ -9,7 +9,7 @@ module Cset = Set.Make(String)
 module Exceptions = struct 
   open Past
   (** Classe déjà définie (position, ident, position de la définition antèrieure *)
-  exception AllreadyDefined of pos * ident * pos
+  exception AlreadyDefined of pos * ident * pos
      
   (** identifiant non définie *)
   exception Undefined of pos * ident
@@ -32,34 +32,35 @@ module ClassAnalysis = struct
   (** construit une Map de classes en vérifiant l'unicité du nommage *)
   let buildClassMap prog =
     let addClass map c =
-      if Cmap.mem c.name map then
-	let c1 = Cmap.find c.name map in
-	raise (AllreadyDefined (c.pos,c.name,c1.pos))
+      if Cmap.mem c.class_name map then
+	let c1 = Cmap.find c.class_name map in
+	raise (AlreadyDefined (c.class_pos,c.class_name,c1.class_pos))
       else
-	Cmap.add c.name c map in
+	Cmap.add c.class_name c map in
     List.fold_left addClass Cmap.empty prog.classes 
 
   (** vérifie que l'héritage est correct et cohérent (aka sans cycle) *)
   let checkHerit cmap =
-    (** parcours les parents de le classe
-	@param c la classe à partir de laquelle on parcours 
+    (** parcourt les parents de le classe
+	@param c la classe à partir de laquelle on parcourt
 	@param graySet L'ensemble des classes découvertes actuellement
 	@param blackSet l'ensemble des classes déjà traitées *)
     let rec dfsVisit c graySet blackSet = 
-      if Cset.mem c.name blackSet then 
+      if Cset.mem c.class_name blackSet then 
 	graySet
       else
-	if Cset.mem c.name graySet then 
-	  raise (Her(c.pos,c.name,"Cycle")) 
+	if Cset.mem c.class_name graySet then 
+	  raise (Her(c.class_pos,c.class_name,"Cycle")) 
 	else
-	  match (fst c.extend) with
-	    | "String" -> raise (Her(c.pos,c.name,"Cannot herite of string"))
-	    | "Object" -> graySet
-	    | c1name -> 
+	  match c.class_extends with
+            | None -> failwith "dfsVisit : doit-on déjà hériter au moins de Object ?"
+	    | Some ("String" , pos) -> raise (Her(pos,c.class_name,"Cannot herite of string"))
+	    | Some ("Object", _) -> graySet
+	    | Some (c1name, pos) -> 
 	      let c1 = 
 		try 
 		  Cmap.find c1name cmap 
-		with Not_found -> raise (Undefined((snd c.extend),c1name))
+		with Not_found -> raise (Undefined(pos,c1name))
 	      in
 	      dfsVisit c1 (Cset.add c1name graySet) blackSet
     in
@@ -73,10 +74,15 @@ module CheckClass = struct
 
   (** calcule si une classe c1 hérite d'une autre classe c2 *)
   let rec isSubClass classes c1 c2 =
-    if c2.name = (fst c1.extend) then true else
-      match (fst c2.extend) with
-	| "Object" -> false
-	| c -> isSubClass classes c1 (Cmap.find c classes)
+    match c1.class_extends with
+      | None -> failwith "Horreur en isSubClass"
+      | Some (extends,_) ->
+        if c2.class_name = extends then true
+        else
+          match c2.class_extends with
+            | None -> failwith "Horreur en isSubClass"
+            | Some ("Object", _) -> false
+	    | Some (c,_) -> isSubClass classes c1 (Cmap.find c classes)
 
   
   (** calcul si t1 est un sous type de t2 *)
@@ -84,9 +90,9 @@ module CheckClass = struct
     match t1,t2 with
       | STypeNull,_ -> true
       | SBool,_ | SInt,_ -> (t1 = t2)
-      | (SC i1),(SC i2) -> isSubClass (Cmap.find i1 classes) (Cmap.find i2 classes)
+      | (SC i1),(SC i2) -> isSubClass (Cmap.find i1 classes) (Cmap.find i2 classes) (* erreur d'utilisation de isSubClass *)
 
-  (** calcule si un profile de type p1 est un sous profile de p2*)      
+  (** calcule si un profil de type p1 est un sous profil de p2*)      
   let profIsSubType cmap p1 p2 = 
     List.for_all2 (isSubType  cmap ) p1 p2 
 
@@ -120,7 +126,7 @@ module  CheckInstr = struct
     
   open Past
   open Sast
-  open  Exception
+  open Exception
 
   let isLeft = function
     | Getval _ -> true
@@ -143,3 +149,5 @@ module  CheckInstr = struct
   let rec typInstr env = 
     | 
 *)
+
+end

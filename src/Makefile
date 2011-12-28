@@ -1,7 +1,7 @@
-CMO=lexer.cmo parser.cmo ast.cmo compile.cmo main.cmo #mips.cmo 
+CMO=ast.cmo lexer.cmo parser.cmo compile.cmo main.cmo #mips.cmo 
 GENERATED =lexer.ml parser.ml parser.mli
 BIN=littleJavaCompiler
-FLAGS=
+FLAGS=-annot
 
 all: $(BIN)
 
@@ -19,7 +19,7 @@ $(BIN):$(CMO)
 .mll.ml:
 	ocamllex $<
 
-.mly.ml:
+.mly.ml: ast.cmo
 	menhir -v --infer $<
 
 .mly.mli:

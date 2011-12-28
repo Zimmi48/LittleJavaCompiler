@@ -2,8 +2,6 @@
 %{
   open Ast.Past
   open Lexing
-  
-  exception PasUnType of pos
 
   let position startpos endpos =
     (* actuellement on se prive de certaines infos *)
