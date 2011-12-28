@@ -69,6 +69,8 @@ end
 module CheckClass = struct
   open Exceptions
   open Past
+  open Sast
+
   (** calcule si une classe c1 hérite d'une autre classe c2 *)
   let rec isSubClass classes c1 c2 =
     if c2.name = (fst c1.extend) then true else
@@ -80,9 +82,9 @@ module CheckClass = struct
   (** calcul si t1 est un sous type de t2 *)
   let isSubType classes t1 t2 = 
     match t1,t2 with
-      | Sast.TypeNull,_ -> true
-      | Sast.Bool,_ | Sast.Int,_ -> (t1 = t2)
-      | (Sast.C i1),(Sast.C i2) -> isSubClass (Cmap.find i1 classes) (Cmap.find i2 classes)
+      | STypeNull,_ -> true
+      | SBool,_ | SInt,_ -> (t1 = t2)
+      | (SC i1),(SC i2) -> isSubClass (Cmap.find i1 classes) (Cmap.find i2 classes)
 
   (** calcule si un profile de type p1 est un sous profile de p2*)      
   let profIsSubType cmap p1 p2 = 
@@ -117,6 +119,7 @@ end
 module  CheckInstr = struct 
     
   open Past
+  open Sast
   open  Exception
 
   let isLeft = function
@@ -125,17 +128,18 @@ module  CheckInstr = struct
   inw
 
 
-  let rec typExpr env =
-    | Iconst (p,i) -> { Sast.v = Sast.Iconst (p,i) ; t = Sast.Int }
-    | Sconst (p,i) -> { Sast.v = Sast.Sconst (p,i) ; t = Sast.C ("String")}
-    | Bconst (p,i) -> { Sast.v = Sast.Bconst (p,i) ; t = Sast.Bool }
-    | Null p -> { Sast.v = Sast.Null p ; t = Sast.TypeNull }
+  let rec typExpr env = function
+    | Iconst (p,i) -> { sv = SIconst (p,i) ; st = SInt }
+    | Sconst (p,i) -> { sv = SSconst (p,i) ; st = SC ("String")}
+    | Bconst (p,i) -> { sv = SBconst (p,i) ; st = SBool }
+    | Null p -> { sv = SNull p ; st = STypeNull }
     | Getval (p,Var "this") -> (
       try let t = Cmap.find "this" env in
-	  { Sast.v = Sast.Getval(p,Sast.Var "this"), t = t }
+	  { sv = SGetval(p,SVar "this"), st = t }
       with Not_found -> raise (Undefined (p,"this"))
     )
-    |
+(*    |
 
   let rec typInstr env = 
     | 
+*)

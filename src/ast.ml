@@ -129,103 +129,103 @@ module Sast = struct
     @param fChar premier charactère
     @param lChar dernier charactère *)
 type pos = { 
-  file : string;
-  line : int;
-  fChar: int;
-  lChar : int;
+  sfile : string;
+  sline : int;
+  sfChar: int;
+  slChar : int;
 }
 
 (** Représentation des types (au sens large) de Petit Java *)
 type types =
-  | TypeNull
-  | Void 
-  | Bool
-  | Int
-  | C of string 
+  | STypeNull
+  | SVoid 
+  | SBool
+  | SInt
+  | SC of string 
 
 (** Les idents contiennent les infos de typage *)
-type ident = { ident : string; t : types }
+type ident = { sident : string; st : types }
 
 (** Opérateurs binaires (toujours infixes) sur les expressions *)
 type binaire =
-  | Eq | Neq | Leq | Geq | Lt | Gt 
-  | Plus | Minus | Star | Div 
-  | Mod 
-  | And | Or
+  | SEq | SNeq | SLeq | SGeq | SLt | SGt 
+  | SPlus | SMinus | SStar | SDiv 
+  | SMod 
+  | SAnd | SOr
     
 (** Opérateurs unaires sur les expressions *)
 type unaire =
-  | Incr | Decr
-  | Not
-  | UMinus
+  | SIncr | SDecr
+  | SNot
+  | SUMinus
     
 (** Appels à des variables, méthodes, et attributs *)
 type vars =
-  | Var of ident
-  | Attr of expr * ident 
+  | SVar of ident
+  | SAttr of expr * ident 
 
 (** Représente la grammaire des expressions, le premier paramètre de chaque constructeur est la position *)
 and expr_v = 
-  | Iconst of pos * int 
-  | Sconst of pos * string 
-  | Bconst of pos * bool 
-  | Null of pos 
-  | Unaire of pos * unaire * expr 
-  | Binaire of pos * binaire * expr * expr 
+  | SIconst of pos * int 
+  | SSconst of pos * string 
+  | SBconst of pos * bool 
+  | SNull of pos 
+  | SUnaire of pos * unaire * expr 
+  | SBinaire of pos * binaire * expr * expr 
   (** caste l'expression *)
-  | Cast of pos * types * expr 
+  | SCast of pos * types * expr 
   (** assigne expr *)
-  | Assign of pos * vars * expr 
+  | SAssign of pos * vars * expr 
   (** Appel d'une méthode, les paramètres sont stockés dans la liste *)
-  | Call of pos * vars * expr list 
+  | SCall of pos * vars * expr list 
   (** Accès a une variable (au sens large) *)
-  | Getval of pos * vars 
+  | SGetval of pos * vars 
   (** expression booléene, vrai si expr est une instance de types *)
-  | Instanceof of pos * expr * types 
+  | SInstanceof of pos * expr * types 
   (** opérateur d'instanciation de la classe ident
       les paramètres du constructeur sont pasés sous forme de liste *)
-  | New of pos * ident * expr list  
+  | SNew of pos * ident * expr list  
 
-and expr = { v : expr_v; t : types }
+and expr = { sv : expr_v; st : types }
 
 (** Repérsente la grammaire des instructions *)
 type instruction  = 
-  | Expr of expr (* pas besoin de pos, c'est la même que celle de l'expression *)
+  | SExpr of expr (* pas besoin de pos, c'est la même que celle de l'expression *)
   (** Déclaration d'une variable, avec éventuellement une initialisation
       Le paramètre de type expr option contient l'initialisation éventuelle *)
-  | Decl of pos * types * ident * expr option
+  | SDecl of pos * types * ident * expr option
   (** Branchement conditionnel, s'il y a une clause "else", elle se trouve dans le paramètre optionnel *)
-  | If of  expr * instruction * instruction option
+  | SIf of  expr * instruction * instruction option
   (**Boucle for, sémantique classique *)
-  | For of expr option * expr option * expr option * instruction option
-  | Block of instruction list
+  | SFor of expr option * expr option * expr option * instruction option
+  | SBlock of instruction list
   (** Expression optionnelles, pour les méthodes void *)
-  | Return of expr option
+  | SReturn of expr option
 
 (** Les variables associèes à leur type *)
 type variable = types * ident
 (** les méthodes et constructeurs *)
 type callable = {
-  call_pos : pos;
-  call_returnType : types;
-  call_name : ident;
-  call_params : variable list;
-  call_body : instruction list;
+  scall_pos : pos;
+  scall_returnType : types;
+  scall_name : ident;
+  scall_params : variable list;
+  scall_body : instruction list;
 }
     
 (** représentation d'une classe *)
 type classe = {
-  class_pos : pos ;
+  sclass_pos : pos ;
   (** Le nom de la classe*)
-  class_name : ident ;
+  sclass_name : ident ;
   (** Liste des relations d'héritages *)
-  class_extends : (ident * pos) option;
+  sclass_extends : (ident * pos) option;
   (** Les attributs, sous forme de paires *)
-  class_attrs : (variable * pos) list;
+  sclass_attrs : (variable * pos) list;
   (** les constructeurs (ils peuvent être surchargés), le champ returnType est toujours nul*)
-  class_consts : callable list;
+  sclass_consts : callable list;
   (** la liste des méthodes, pouvant avoir des noms identiques *)
-  class_methods : callable list;
+  sclass_methods : callable list;
 }
 
 end
