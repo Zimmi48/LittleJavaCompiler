@@ -90,4 +90,4 @@ and comment = parse
   | '\n' { newline lexbuf ; comment lexbuf }
   | "*/" { () }
   | _    { comment lexbuf }
-  | eof  { failwith "Commentaire non terminé" }
+  | eof  { raise Ast.Past.CommentaireNonTermine }

@@ -1,7 +1,7 @@
 CMO=ast.cmo lexer.cmo parser.cmo compile.cmo main.cmo #mips.cmo 
-GENERATED =lexer.ml parser.ml parser.mli
-BIN=littleJavaCompiler
-FLAGS=-annot
+GENERATED=lexer.ml parser.ml parser.mli
+BIN=pjava
+FLAGS=
 
 all: $(BIN)
 
@@ -19,20 +19,19 @@ $(BIN):$(CMO)
 .mll.ml:
 	ocamllex $<
 
-.mly.ml: ast.cmo
+.mly.ml:
 	menhir -v --infer $<
 
 .mly.mli:
 	ocamlyacc -v $<
 
 clean:
-	rm -f *.cm[io] *.o *~ $(BIN) $(GENERATED) parser.output
+	rm -f *.cm[io] *.o *~ $(BIN) $(GENERATED) parser.output parser.automaton
 
 .depend depend:$(GENERATED)
 	rm -f .depend
 	ocamldep *.ml *.mli > .depend
 
 include .depend
-
 
 

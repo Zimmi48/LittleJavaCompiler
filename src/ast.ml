@@ -18,6 +18,7 @@ type pos = {
 
 (** Exception à usage dans le parser *)
   exception PasUnType of pos
+  exception CommentaireNonTermine
 
 (** Les idents sont des chaines *)
 type ident = string

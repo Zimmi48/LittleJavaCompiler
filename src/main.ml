@@ -94,14 +94,18 @@ let () =
     | Parser.Error -> 
 	(* Erreur syntaxique. On récupère sa position absolue et on la 
 	   convertit en numéro de ligne *)
-	localisation (Lexing.lexeme_start_p buf);
-	eprintf "Erreur dans l'analyse syntaxique@.";
-	exit 1
+      localisation (Lexing.lexeme_start_p buf);
+      eprintf "Erreur dans l'analyse syntaxique@.";
+      exit 1
     | Ast.Past.PasUnType pos ->
       (* Erreur syntaxique spéciale *)
       localisationBis pos ;
       eprintf "Erreur dans l'analyse syntaxique. Ceci n'est pas un type@.";
-    | TypeClass.Exceptions.AlreadyDefined (pos1, id, pos2) ->
+      exit 1
+    | Ast.Past.CommentaireNonTermine ->
+      eprintf "Erreur dans l'analyse lexicale : commentaire non terminé@.";
+      exit 1
+(*    | TypeClass.Exceptions.AlreadyDefined (pos1, id, pos2) ->
       localisationBis pos1 ;
       localisationBis pos2 ;
       eprintf "Erreur : cette classe est définie plusieurs fois@.";
@@ -118,7 +122,7 @@ let () =
       match sty with
         | None -> eprintf "qui n'est pas le type attendu@."
         | Some ty ->
-          eprintf "mais le type attendu était %s@." (affichePType ty) ;
+          eprintf "mais le type attendu était %s@." (affichePType ty) ;*)
 (*  | ... *)
 
 

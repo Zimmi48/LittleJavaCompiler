@@ -1,5 +1,5 @@
 (** Typage statique *)
-open Ast
+(*open Ast
 
 module Cmap = Map.Make(String)
 module Cset = Set.Make(String)
@@ -151,3 +151,4 @@ module  CheckInstr = struct
 *)
 
 end
+*)
