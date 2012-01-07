@@ -1,33 +1,31 @@
 (** Typage statique *)
-(*open Ast
+open Ast.Past
+open Ast.Sast
 
 module Cmap = Map.Make(String)
 module Cset = Set.Make(String)
 
 
 (** L'ensemble des exceptions de l'analyse sémantique *)
-module Exceptions = struct 
-  open Past
+module Exceptions = struct
   (** Classe déjà définie (position, ident, position de la définition antèrieure *)
-  exception AlreadyDefined of pos * ident * pos
+  exception AlreadyDefined of pos * string * pos
      
   (** identifiant non définie *)
-  exception Undefined of pos * ident
+  exception Undefined of pos * string
       
   (** erreur d'Héritage *)
-  exception Her of pos * ident * string
-     
+  exception Her of pos * string * string
+      
   (** mauvais type, optionnellement le type attendu *)
-  exception WrongType of pos * types * types option
+  exception WrongType of pos * stypes * stypes option
 
 end
 
-  
+(*  
 (** Définition des classes et vérification d'unicité *)
 module ClassAnalysis = struct
   open Exceptions
-   
-  open Past
 
   (** construit une Map de classes en vérifiant l'unicité du nommage *)
   let buildClassMap prog =
@@ -121,34 +119,59 @@ module CheckClass = struct
   (** vérifie les constructeurs *)
   (**let checkConst *)
 end	
-
+*)
 module  CheckInstr = struct 
-    
-  open Past
-  open Sast
-  open Exception
+
+  open Exceptions
 
   let isLeft = function
     | Getval _ -> true
     | _ -> false
-  inw
-
 
   let rec typExpr env = function
-    | Iconst (p,i) -> { sv = SIconst (p,i) ; st = SInt }
-    | Sconst (p,i) -> { sv = SSconst (p,i) ; st = SC ("String")}
-    | Bconst (p,i) -> { sv = SBconst (p,i) ; st = SBool }
-    | Null p -> { sv = SNull p ; st = STypeNull }
+    | Iconst (p,i) -> { sv = SIconst i ; st = SInt ; sp = p }
+    | Sconst (p,i) -> { sv = SSconst i ; st = SC ("String") ; sp = p }
+    | Bconst (p,i) -> { sv = SBconst i ; st = SBool ; sp = p }
+    | Null p -> { sv = SNull ; st = STypeNull ; sp = p }
+    | Unaire (p, op, e) ->
+      let se = typExpr env e in
+      let sop = match op with
+        | Incr ->
+          if se.st = SInt then SIncr
+          else raise (WrongType (se.sp, se.st, Some SInt))
+        | Decr ->
+          if se.st = SInt then SDecr
+          else raise (WrongType (se.sp, se.st, Some SInt))
+        | Not ->
+          if se.st = SBool then SNot
+          else raise (WrongType (se.sp, se.st, Some SBool))
+        | UMinus ->
+          if se.st = SInt then SUMinus
+          else raise (WrongType (se.sp, se.st, Some SInt))
+      in
+      { sv = SUnaire (sop, se) ; st = se.st ; sp = p }
+    | Binaire (p, op, e1, e2) ->
+      let se1 = typExpr env e1 in
+      let se2 = typExpr env e2 in
+      (* à modifier pour faire les vérifs de types *)
+      let sop = match op with
+        | Eq -> SEq | Neq -> SNeq | Leq -> SLeq | Geq -> SGeq
+        | Lt -> SLt | Gt -> SGt
+        | Plus -> SPlus | Minus -> SMinus | Star -> SStar | Div -> SDiv
+        | Mod -> SMod
+        | And -> SAnd | Or -> SOr
+      in
+      { sv = SBinaire (sop, se1, se2) ; st = se1.st ; sp = p }
     | Getval (p,Var "this") -> (
       try let t = Cmap.find "this" env in
-	  { sv = SGetval(p,SVar "this"), st = t }
+	  { sv = SGetval (SVar { id_id = "this" ; id_typ = t} ) ;
+            st = t ; sp = p }
       with Not_found -> raise (Undefined (p,"this"))
     )
-(*    |
+    | _ -> failwith "Not implemented"
 
-  let rec typInstr env = 
-    | 
-*)
+  let rec typInstr env = function
+    | Expr e -> SExpr (typExpr env e)
+    | _ -> failwith "Not implemented"
 
 end
-*)

@@ -1,4 +1,4 @@
-CMO=ast.cmo lexer.cmo parser.cmo mips.cmo compile.cmo main.cmo
+CMO=ast.cmo lexer.cmo parser.cmo typeClass.cmo type.cmo mips.cmo compile.cmo main.cmo
 GENERATED=lexer.ml parser.ml parser.mli
 BIN=pjava
 FLAGS=
@@ -26,7 +26,7 @@ $(BIN):$(CMO)
 	ocamlyacc -v $<
 
 clean:
-	rm -f *.cm[io] *.o *~ $(BIN) $(GENERATED) parser.output parser.automaton
+	rm -f *.cm[io] *.o *~ *.annot $(BIN) $(GENERATED) parser.output parser.automaton
 
 .depend depend:$(GENERATED)
 	rm -f .depend

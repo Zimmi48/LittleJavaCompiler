@@ -1,3 +1,4 @@
+(* à partir d'un fichier de J-C. Filliâtre *)
 
 type register = 
   | A0 | A1 | V0 | S0 | RA | SP | FP
@@ -10,7 +11,8 @@ type operand =
   | Oimm of int
   | Oreg of register
 
-type arith = Add | Sub | Mul | Div
+type arith = | Add | Sub | Mul | Div | Mod
+             | Eq | Neq | Leq | Geq | Lt | Gt
 
 type instruction =
   | Move of register * register
@@ -19,6 +21,8 @@ type instruction =
   | Lw of register * address
   | Sw of register * address
   | Arith of arith * register * register * operand
+  (* au sens large pour tout type d'opérateur binaire *)
+  | Neg of register * register
   | Jal of string
   | Jr of register
   | Syscall

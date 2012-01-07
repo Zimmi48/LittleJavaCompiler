@@ -1,3 +1,4 @@
+(* à partir d'un fichier de J-C. Filliâtre *)
 
 type register = 
   | A0 | A1 | V0 | S0 | RA | SP | FP
@@ -10,7 +11,8 @@ type operand =
   | Oimm of int
   | Oreg of register
 
-type arith = Add | Sub | Mul | Div
+type arith = | Add | Sub | Mul | Div | Mod
+             | Eq | Neq | Leq | Geq | Lt | Gt
 
 type instruction =
   | Move of register * register
@@ -19,6 +21,8 @@ type instruction =
   | Lw of register * address
   | Sw of register * address
   | Arith of arith * register * register * operand
+  (* au sens large pour tout type d'opérateur binaire *)
+  | Neg of register * register
   | Jal of string
   | Jr of register
   | Syscall
@@ -49,6 +53,13 @@ let print_arith fmt = function
   | Sub -> pp_print_string fmt "sub"
   | Mul -> pp_print_string fmt "mul"
   | Div -> pp_print_string fmt "div"
+  | Mod -> failwith "Not implemented"
+  | Eq -> pp_print_string fmt "seq"
+  | Neq -> pp_print_string fmt "sne"
+  | Leq -> pp_print_string fmt "sle"
+  | Geq -> pp_print_string fmt "sge"
+  | Lt -> pp_print_string fmt "slt"
+  | Gt -> pp_print_string fmt "sgt"
 
 let print_address fmt = function
   | Alab s -> pp_print_string fmt s
@@ -72,6 +83,8 @@ let print_instruction fmt = function
   | Arith (a, dst, src, op) ->
       fprintf fmt "\t%a  %a, %a, %a\n" 
 	print_arith a print_register dst print_register src print_operand op
+  | Neg (dst, src) -> fprintf fmt "\tneg   %a, %a\n"
+    print_register dst print_register src
   | Jal s ->
       fprintf fmt "\tjal  %s\n" s
   | Jr r ->

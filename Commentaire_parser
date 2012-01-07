@@ -2,6 +2,7 @@ Le parser est fini.
 Il gère l'intégralité de la grammaire demandée dans le projet.
 Il est possible qu'il accepte une grammaire un peu plus large que le
 compilateur Java.
+Cela peut être réglé au moment du typage.
 Cela reste à confirmer, mais en effet, il semblerait que ce dernier
 n'accepte pas les expressions du genre ++ ++ a. Pourtant elles sont
 clairement permises si on se réfère au dernier chapitre (grammaire du

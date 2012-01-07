@@ -78,6 +78,7 @@ let () =
     if !parse_only then exit 0;
     
     (* Typage *)
+    let p = Type.type_program p in
     
     (* Compilation de l'arbre de syntaxe abstraite p. Le code machine 
        résultant de cette transformation doit être écrit dans le fichier 
