@@ -104,7 +104,13 @@ let () =
       eprintf "Erreur dans l'analyse syntaxique. Ceci n'est pas un type@.";
       exit 1
     | Ast.Past.CommentaireNonTermine ->
+      localisationBis { Ast.Past.file = "" ; line = 0 ; fChar = 0 ; lChar = 0 } ;
       eprintf "Erreur dans l'analyse lexicale : commentaire non terminé@.";
+      exit 1
+    | Ast.Past.ClassMain pos ->
+      (* Erreur syntaxique spéciale *)
+      localisationBis pos ;
+      eprintf "Erreur dans l'analyse syntaxique.Mauvaise définition de class Main@.";
       exit 1
 (*    | TypeClass.Exceptions.AlreadyDefined (pos1, id, pos2) ->
       localisationBis pos1 ;

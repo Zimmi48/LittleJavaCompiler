@@ -20,11 +20,12 @@ let compile_program p ofile =
     | SNull -> La (A0, "null") :: acc
     | SUnaire (op, e) ->
       compile_expr e (
-        match op with
+        match op with (* Ce n'est pas ça qu'il faut faire
           | SIncr -> Arith (Add, A0, A0, Oimm 1) :: acc
-          | SDecr -> Arith (Sub, A0, A0, Oimm 1) :: acc
+          | SDecr -> Arith (Sub, A0, A0, Oimm 1) :: acc *)
           | SNot -> Arith (Eq, A0, A0, Oimm 0) :: acc
           | SUMinus -> Neg (A0, A0) :: acc
+          | _ -> failwith "Not implemented"
       )
     | SBinaire (op, e1, e2) ->
       (* surcharge des opérateurs non gérées :

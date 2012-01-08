@@ -31,6 +31,7 @@
 %token <string> STRING_CST
 %token <string> IDENT
 %token BOOLEAN, CLASS, ELSE, EXTENDS, FALSE, FOR, IF, INSTANCEOF, INT, NEW, NULL, PUBLIC, RETURN, STATIC, THIS, TRUE, VOID
+%token CLASS_MAIN MAIN LBRACKET RBRACKET
 %token EOF 
 %token EQ
 %token LP RP (* parenthèses *)
@@ -41,7 +42,6 @@
 %token NOT
 %token DOT
 %token COMMA SEMICOLON
-%token CLASSMAIN (* on traite la classe Main à part *)
 
 /* Définitions des priorités et associativités des tokens */
 
@@ -61,21 +61,34 @@
 %%
 
 fichier:
-l = classe* m = classe_Main EOF { { classes = l ; instr = m } }
+l = classe* EOF {
+  let rec checkClasses = function
+    | [Instr m] -> [] , m
+    | Class c :: t -> let l , m = checkClasses t in c :: l , m
+    | _ -> raise (ClassMain (position $startpos $endpos)) in
+  let l , m = checkClasses l in
+  { classes = l ; instr = m } }
 ;
 
 classe:
-  CLASS id = IDENT e = extends? LB d = decl* RB
+  | CLASS id = IDENT e = extends? LB d = decl* RB
     {
       let a, c, m = attrsAndConstsAndMethods_of_decls d in
-      {
+      Class {
         class_pos = position $startpos $endpos ;
         class_name = id ;
-        class_extends =  e ;
+        class_extends = e ;
         class_attrs = a ;
         class_consts = c ;
         class_methods = m }
     }
+  | CLASS CLASS_MAIN
+      LB
+      PUBLIC STATIC VOID MAIN LP st = IDENT IDENT LBRACKET RBRACKET RP
+    LB l = instructions RB
+    RB
+    { if st = "String" then Instr l
+      else raise (ClassMain (position $startpos $endpos)) }
 ;
 
 extends:
@@ -124,9 +137,6 @@ methode:
 parametre:
 t = typ id = IDENT { t, id }
 ;
-
-classe_Main:
-CLASSMAIN LB l = instructions RB RB { l }
 ;
 
 typNatif:
