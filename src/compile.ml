@@ -18,34 +18,53 @@ let compile_program p ofile =
       La (A0 , adresse) :: acc
     | SBconst b -> Li (A0, int_of_bool b) :: acc
     | SNull -> La (A0, "null") :: acc
-    | SUnaire (op, e) ->
-      compile_expr e (
-        match op with (* Ce n'est pas ça qu'il faut faire
-          | SIncr -> Arith (Add, A0, A0, Oimm 1) :: acc
-          | SDecr -> Arith (Sub, A0, A0, Oimm 1) :: acc *)
-          | SNot -> Arith (Eq, A0, A0, Oimm 0) :: acc
-          | SUMinus -> Neg (A0, A0) :: acc
-          | _ -> failwith "Not implemented"
-      )
+    | SNot e -> compile_expr e (Arith (Eq, A0, A0, Oimm 0) :: acc)
+    | SUMinus e -> compile_expr e (Neg (A0, A0) :: acc)
+    (* SPref / SPost *)
     | SBinaire (op, e1, e2) ->
       (* surcharge des opérateurs non gérées :
          seulement fonctionne avec les ints et bool *)
-      compile_expr e2 (
+      compile_expr e2 ( (* compile e2 et stocke sur la pile *)
         Sw (A0, Areg (0, SP)) ::
           Arith (Sub, SP, SP, Oimm 4) ::
-          compile_expr e1 (
+          compile_expr e1 ( (* compile e1 et laisse dans A0 *)
             Arith (Add, SP, SP, Oimm 4) ::
-              Lw (A1, Areg (0, SP)) ::
-              Arith ( begin
-                match op with
-                  | SEq -> Eq | SNeq -> Neq | SLeq -> Leq | SGeq -> Geq
-                  | SLt -> Lt | SGt -> Gt
-                  | SPlus | SOr -> Add
-                  | SMinus -> Sub
-                  | SStar | SAnd -> Mul
-                  | SDiv -> Div | SMod -> Mod
-              end
-              , A0, A0, Oreg A1) :: acc) )
+              Lw (A1, Areg (0, SP)) :: (* cherche la valeur de e2 *)
+              begin
+              if e1.st = SInt & e2.st = SInt then
+                Arith (
+                  begin
+                    match op with
+                      | SEq -> Eq | SNeq -> Neq
+                      | SLeq -> Leq | SGeq -> Geq
+                      | SLt -> Lt | SGt -> Gt
+                      | SPlus -> Add
+                      | SMinus -> Sub
+                      | SStar -> Mul
+                      | SDiv -> Div | SMod -> Mod
+                      | _ -> failwith "Typage mal fait"
+                  end
+                    , A0, A0, Oreg A1 )
+                :: acc
+              else if e1.st = SBool & e2.st = SBool then
+                Arith (Neq, A0, A0, Oimm 0) ::
+              (* on renormalise : A0 != 0 devient 1 ; 0 reste 0
+                 afin que la comparaison Eq ou Neq ait lieu correctement *)
+                  Arith (Neq, A1, A1, Oimm 0) ::
+                  Arith (
+                    begin
+                      match op with
+                      | SEq -> Eq | SNeq -> Neq
+                      | SOr -> Add
+                      | SAnd -> Mul
+                      | _ -> failwith "Typage mal fait"
+                  end
+                    , A0, A0, Oreg A1 )
+                :: acc
+              else failwith "Not implemented"
+              (* rajouter les comparaisons généralisées et la concaténation 
+                 de chaînes *)
+              end ) )
     | _ -> failwith "Not implemented"
   in
   let rec compile_instr instr acc = match instr with
