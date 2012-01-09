@@ -24,7 +24,6 @@ module Past = struct
   (** Exception à usage dans le parser *)
   exception ClassMain of pos
   exception PasUnType of pos
-  exception NotALeftValue of pos
   exception CommentaireNonTermine
 
   (** Les idents sont des chaines *)

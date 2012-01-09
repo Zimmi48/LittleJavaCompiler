@@ -22,13 +22,13 @@ $(BIN):$(CMO)
 .mly.ml:
 	menhir -v --infer $<
 
-.mly.mli:
-	ocamlyacc -v $<
+#.mly.mli:
+#	ocamlyacc -v $<
 
 clean:
-	rm -f *.cm[io] *.o *~ *.annot $(BIN) $(GENERATED) *.output *.automaton *.conflits
+	rm -f *.cm[io] *.o *~ *.annot *.conflicts *.output *.automaton $(BIN) $(GENERATED)
 
-.depend depend:$(GENERATED)
+.depend depend:ast.cmo $(GENERATED)
 	rm -f .depend
 	ocamldep *.ml *.mli > .depend
 
