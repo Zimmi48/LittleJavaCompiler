@@ -71,7 +71,22 @@ let compile_program p ofile =
     | SExpr e -> compile_expr e acc
     | _ -> failwith "Not implemented"
   in
-  let instrs = List.fold_right compile_instr p.sinstr [] in
+  let instrs =
+    [Label "main";
+     Move (S0, RA);
+(*     Arith (Mips.Sub, SP, SP, Oimm !frame_size); (* Alloue la frame *)
+     Arith (Mips.Add, FP, SP, Oimm (!frame_size - 4)) (* Initialise $fp *)*)
+    ] @
+      List.fold_right compile_instr p.sinstr [
+    (* fin de main *)
+(*        Arith (Mips.Add, SP, SP, Oimm !frame_size); (* Désalloue la frame *)*)
+        Move (RA, S0);
+        Jr RA;
+        Label "print"; (* implémentation de print *)
+        Li (V0, 1);
+        Syscall;
+        Jr RA      
+      ] in
   let p = { text = instrs ; data = !data } in
   let f = open_out ofile in
   let fmt = formatter_of_out_channel f in
