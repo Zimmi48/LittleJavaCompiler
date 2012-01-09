@@ -24,6 +24,7 @@ module Past = struct
   (** Exception à usage dans le parser *)
   exception ClassMain of pos
   exception PasUnType of pos
+  exception NotALeftValue of pos
   exception CommentaireNonTermine
 
   (** Les idents sont des chaines *)
@@ -42,12 +43,9 @@ module Past = struct
     | Plus | Minus | Star | Div 
     | Mod 
     | And | Or
-        
-  (** Opérateurs unaires sur les expressions *)
-  type unaire =
-    | Incr | Decr
-    | Not
-    | UMinus
+
+  (** Opérateurs unaires prefixes et postfixes sur les expressions *)
+  type prefpost = Incr | Decr
         
   (** Appels à des variables, méthodes, et attributs *)
   type vars =
@@ -60,7 +58,11 @@ module Past = struct
     | Sconst of pos * string
     | Bconst of pos * bool
     | Null of pos
-    | Unaire of pos * unaire * expr
+(* CODE MORT   | Unaire of pos * unaire * expr*)
+    | Not of pos * expr
+    | UMinus of pos * expr
+    | Pref of pos * prefpost * expr
+    | Post of pos * prefpost * expr
     | Binaire of pos * binaire * expr * expr
     (** caste l'expression *)
     | Cast of pos * types * expr
@@ -156,12 +158,10 @@ module Sast = struct
     | SPlus | SMinus | SStar | SDiv 
     | SMod 
     | SAnd | SOr
-        
-  (** Opérateurs unaires sur les expressions *)
-  type unaire =
-    | SIncr | SDecr
-    | SNot
-    | SUMinus
+     
+
+  (** Opérateurs unaires prefixes et postfixes sur les expressions *)
+  type prefpost = SIncr | SDecr   
         
   (** Appels à des variables, méthodes, et attributs *)
   type vars =
@@ -172,9 +172,12 @@ module Sast = struct
   and expr_v = 
     | SIconst of int 
     | SSconst of string 
-    | SBconst of bool 
+    | SBconst of bool
     | SNull
-    | SUnaire of unaire * expr 
+    | SNot of expr
+    | SUMinus of expr
+    | SPref of prefpost * vars
+    | SPost of prefpost * vars
     | SBinaire of binaire * expr * expr 
     (** caste l'expression *)
     | SCast of stypes * expr 

@@ -20,6 +20,9 @@ module Exceptions = struct
   (** mauvais type, optionnellement le type attendu *)
   exception WrongType of pos * stypes * stypes option
 
+  (** pas une valeur gauche *)
+  exception NotALeftValue of pos
+
 end
 
 (*  
@@ -128,40 +131,92 @@ module  CheckInstr = struct
     | Getval _ -> true
     | _ -> false
 
+  let traduct_opUn = function Incr -> SIncr | Decr -> SDecr
+
   let rec typExpr env = function
     | Iconst (p,i) -> { sv = SIconst i ; st = SInt ; sp = p }
     | Sconst (p,i) -> { sv = SSconst i ; st = SC ("String") ; sp = p }
     | Bconst (p,i) -> { sv = SBconst i ; st = SBool ; sp = p }
     | Null p -> { sv = SNull ; st = STypeNull ; sp = p }
-    | Unaire (p, op, e) ->
+    | Not (p,e) ->
       let se = typExpr env e in
-      let sop = match op with
-        | Incr ->
-          if se.st = SInt then SIncr
+      if se.st = SBool then { sv = SNot se ; st = SBool ; sp = p }
+      else raise (WrongType (se.sp, se.st, Some SBool))
+    | UMinus (p,e) ->
+      let se = typExpr env e in
+      if se.st = SInt then { sv = SUMinus se ; st = SInt ; sp = p }
+      else raise (WrongType (se.sp, se.st, Some SInt))
+    | Pref (p, op, e) ->
+      let se = typExpr env e in
+      begin
+      match se.sv with
+        | SGetval a ->
+          if se.st = SInt then
+            { sv = SPref (traduct_opUn op, a) ; st = SInt ; sp = p }
           else raise (WrongType (se.sp, se.st, Some SInt))
-        | Decr ->
-          if se.st = SInt then SDecr
+        | _ -> raise (NotALeftValue se.sp)
+      end
+    | Post (p, op, e) ->
+      let se = typExpr env e in
+      begin
+      match se.sv with
+        | SGetval a ->
+          if se.st = SInt then
+            { sv = SPost (traduct_opUn op, a) ; st = SInt ; sp = p }
           else raise (WrongType (se.sp, se.st, Some SInt))
-        | Not ->
-          if se.st = SBool then SNot
-          else raise (WrongType (se.sp, se.st, Some SBool))
-        | UMinus ->
-          if se.st = SInt then SUMinus
-          else raise (WrongType (se.sp, se.st, Some SInt))
-      in
-      { sv = SUnaire (sop, se) ; st = se.st ; sp = p }
+        | _ -> raise (NotALeftValue se.sp)
+      end
     | Binaire (p, op, e1, e2) ->
       let se1 = typExpr env e1 in
       let se2 = typExpr env e2 in
       (* à modifier pour faire les vérifs de types *)
-      let sop = match op with
-        | Eq -> SEq | Neq -> SNeq | Leq -> SLeq | Geq -> SGeq
-        | Lt -> SLt | Gt -> SGt
-        | Plus -> SPlus | Minus -> SMinus | Star -> SStar | Div -> SDiv
-        | Mod -> SMod
-        | And -> SAnd | Or -> SOr
+      let sop , typ_retour = match op with
+        | Eq | Neq -> failwith "Not implemented"
+        | Leq | Geq | Lt | Gt ->
+          if se1.st = SInt then
+            if se2.st = SInt then
+              begin
+                match op with
+                  | Leq -> SLeq | Geq -> SGeq | Lt -> SLt | Gt -> SGt
+                  | _ -> failwith "Erreur 42"
+              end , SBool
+            else raise (WrongType (se2.sp, se2.st, Some SInt))
+          else raise (WrongType (se1.sp, se1.st, Some SInt))
+        | Plus ->
+          if se1.st = SC "String" or se2.st = SC "String" then
+            if se1.st = SInt or se1.st = SC "String" then
+              if se2.st = SInt or se2.st = SC "String" then
+                SPlus, SC "String"
+              else raise (WrongType (se2.sp, se2.st, None))
+            else raise (WrongType (se1.sp, se1.st, None))
+          else if se1.st = SInt then
+            if se2.st = SInt then
+              SPlus, SInt
+            else raise (WrongType (se2.sp, se2.st, None))
+          else raise (WrongType (se1.sp, se1.st, None))
+        | Minus | Star | Div | Mod ->
+          if se1.st = SInt then
+            if se2.st = SInt then
+              begin
+                match op with
+                  | Minus -> SMinus
+                  | Star -> SStar | Div -> SDiv | Mod -> SMod
+                  | _ -> failwith "Erreur 42"
+              end , SInt
+            else raise (WrongType (se2.sp, se2.st, Some SInt))
+          else raise (WrongType (se1.sp, se1.st, Some SInt))
+        | And | Or ->
+          if se1.st = SBool then
+            if se2.st = SBool then
+              begin
+                match op with
+                  | And -> SAnd | Or -> SOr
+                  | _ -> failwith "Erreur 42"
+              end , SBool
+            else raise (WrongType (se2.sp, se2.st, Some SBool))
+          else raise (WrongType (se1.sp, se1.st, Some SBool))
       in
-      { sv = SBinaire (sop, se1, se2) ; st = se1.st ; sp = p }
+      { sv = SBinaire (sop, se1, se2) ; st = typ_retour ; sp = p }
     | Getval (p,Var "this") -> (
       try let t = Cmap.find "this" env in
 	  { sv = SGetval (SVar { id_id = "this" ; id_typ = t} ) ;

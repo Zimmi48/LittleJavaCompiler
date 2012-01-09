@@ -45,12 +45,15 @@
 
 /* Définitions des priorités et associativités des tokens */
 
+%right EQ
 %left OR
 %left AND
 %left ISEQ NEQ
 %left LT LEQ GT GEQ INSTANCEOF
 %left PLUS MINUS
 %left TIMES DIV MOD
+%right PLUSPLUS MINUSMINUS uminus NOT cast
+%nonassoc atome
 
 /* Point d'entrée de la grammaire */
 %start fichier
@@ -156,8 +159,34 @@ expr:
     { Call (position $startpos $endpos , a , l) }
 | NEW id = IDENT LP l = separated_list(COMMA, expr) RP
     { New (position $startpos $endpos , id , l) }
-| e = sousExpr { e }
-;
+| e1 = expr op = opInfix e2 = expr
+    { Binaire (position $startpos $endpos , op , e1 , e2) }
+| e = expr INSTANCEOF t = typ
+    { Instanceof (position $startpos $endpos , e , t) }
+| op = opPrefPost a = expr
+    { Pref (position $startpos $endpos , op , a) }
+| a = expr op = opPrefPost
+    { Post (position $startpos $endpos , op , a) }
+| NOT e = expr
+    { Not (position $startpos $endpos, e) }
+| MINUS e = expr %prec uminus
+    { UMinus (position $startpos $endpos, e) }
+| LP t = typNatif RP f = expr %prec cast
+    { Cast (position $startpos $endpos , t , f) }
+| LP e = expr RP f = expr %prec cast
+    { match e with
+      | Getval (_ , Var id) -> Cast (position $startpos $endpos , C id , f)
+      | _ -> raise (PasUnType (position $startpos $endpos)) }
+| LP e = expr RP %prec atome { e }
+| i = INT_CST    { Iconst (position $startpos $endpos , i) }
+| s = STRING_CST { Sconst (position $startpos $endpos , s) }
+| TRUE           { Bconst (position $startpos $endpos , true) }
+| FALSE          { Bconst (position $startpos $endpos , false) }
+| THIS { Getval (position $startpos $endpos , Var "this") }
+(* l'Ast ne gère pas ce type d'accès séparément. On le traite comme les autres à l'environnement de faire la différence *)
+| NULL           { Null (position $startpos $endpos) }
+| a = acces
+    { Getval (position $startpos $endpos , a) }
 
 %inline opInfix:
 | ISEQ { Eq }
@@ -173,64 +202,10 @@ expr:
 | MOD { Mod }
 | AND { And }
 | OR { Or }
-;
 
-sousExpr:
-| e1 = sousExpr op = opInfix e2 = sousExpr
-    { Binaire (position $startpos $endpos , op , e1 , e2) }
-| e = sousExpr INSTANCEOF t = typ
-    { Instanceof (position $startpos $endpos , e , t) }
-| f = facteur { f }
-;
-
-opPrefPost:
+%inline opPrefPost:
 | PLUSPLUS { Incr }
 | MINUSMINUS { Decr }
-;
-
-facteurTresLimite:
-| LP t = typNatif RP f = facteur
-    { Cast (position $startpos $endpos , t , f) }
-| LP e = expr RP f = facteurTresLimite
-    { match e with
-      | Getval (_ , Var id) -> Cast (position $startpos $endpos , C id , f)
-      | _ -> raise (PasUnType (position $startpos $endpos)) }
-| LP e = expr RP op = opPrefPost f = facteurLimite
-    { match e with
-      | Getval (_ , Var id) ->
-        Cast (position $startpos $endpos , C id ,
-              Unaire (position $startpos(f) $endpos(f) , op , f) )
-      | _ -> raise (PasUnType (position $startpos $endpos)) }
-| LP e = expr RP { e }
-| f = atome op = opPrefPost | LP f = expr RP op = opPrefPost
-    { Unaire (position $startpos $endpos , op , f) }
-| NOT f = facteur
-    { Unaire (position $startpos $endpos , Not , f) }
-| a = atome { a }
-;
-
-facteurLimite:
-| op = opPrefPost f = facteur
-    { Unaire (position $startpos $endpos , op , f) }
-| f = facteurTresLimite { f }
-
-
-facteur:
-| MINUS f = facteur { Unaire (position $startpos $endpos , UMinus , f) }
-| f = facteurLimite { f }
-;
-
-atome:
-| i = INT_CST    { Iconst (position $startpos $endpos , i) }
-| s = STRING_CST { Sconst (position $startpos $endpos , s) }
-| TRUE           { Bconst (position $startpos $endpos , true) }
-| FALSE          { Bconst (position $startpos $endpos , false) }
-| THIS { Getval (position $startpos $endpos , Var "this") }
-(* l'Ast ne gère pas ce type d'accès séparément. On le traite comme les autres
-   à l'environnement de faire la différence *)
-| NULL           { Null (position $startpos $endpos) }
-| a = acces { Getval (position $startpos $endpos , a) }
-;
 
 acces:
 | id = IDENT { Var id }
