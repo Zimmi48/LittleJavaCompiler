@@ -13,9 +13,10 @@ module General = struct
     fChar: int;
     lChar : int;
   }
-
-
 end
+
+module Cmap = Map.Make(String)
+
 (** Syntaxe issue du parsage *)
 module Past = struct
 
@@ -26,113 +27,134 @@ module Past = struct
   exception PasUnType of pos
   exception CommentaireNonTermine
 
-  (** Les idents sont des chaines *)
-  type ident = string
-      
-  (** Représentation des types de Petit Java *)
-  type types =
-    | Void
-    | Bool
-    | Int
-    | C of string 
+(** Les idents sont des chaines *)
+type ident = string
+  
+(** Représentation des types de Petit Java *)
+type types =
+  | Void
+  | Bool
+  | Int
+  | C of string 
 
-  (** Opérateurs binaires (toujours infixes) sur les expressions *)
-  type binaire =
-    | Eq | Neq | Leq | Geq | Lt | Gt 
-    | Plus | Minus | Star | Div 
-    | Mod 
-    | And | Or
+(** Opérateurs binaires (toujours infixes) sur les expressions *)
+type binaire =
+  | Eq | Neq | Leq | Geq | Lt | Gt 
+  | Plus | Minus | Star | Div 
+  | Mod 
+  | And | Or
+    
+(** Opérateurs unaires sur les expressions *)
+type unaire =
+  | Incr | Decr
+  | Not
+  | UMinus
+    
+(** Appels à des variables, méthodes, et attributs *)
+type vars =
+  | Var of ident
+  | Attr of expr * ident 
 
-  (** Opérateurs unaires prefixes et postfixes sur les expressions *)
-  type prefpost = Incr | Decr
-        
-  (** Appels à des variables, méthodes, et attributs *)
-  type vars =
-    | Var of ident
-    | Attr of expr * ident 
+(** Représente la grammaire des expressions, le premier paramètre de chaque constructeur est la position *)
+and expr = 
+  | Iconst of pos * int
+  | Sconst of pos * string
+  | Bconst of pos * bool
+  | Null of pos
+  | Unaire of pos * unaire * expr
+  | Binaire of pos * binaire * expr * expr
+  (** caste l'expression *)
+  | Cast of pos * types * expr
+  (** assigne expr *)
+  | Assign of pos * vars * expr
+  (** Appel d'une méthode, les paramètres sont stockés dans la liste *)
+  | Call of pos * vars * expr list
+  (** Accès a une variable (au sens large) *)
+  | Getval of pos * vars  
+  (** expression booléene, vrai si expr est une instance de types *)
+  | Instanceof of pos * expr * types
+  (** opérateur d'instanciation de la classe ident
+      les paramètres du constructeur sont pasés sous forme de liste *)
+  | New of pos * ident * expr list 
 
-  (** Représente la grammaire des expressions, le premier paramètre de chaque constructeur est la position *)
-  and expr = 
-    | Iconst of pos * int
-    | Sconst of pos * string
-    | Bconst of pos * bool
-    | Null of pos
-    | Not of pos * expr
-    | UMinus of pos * expr
-    | Pref of pos * prefpost * expr
-    | Post of pos * prefpost * expr
-    | Binaire of pos * binaire * expr * expr
-    (** caste l'expression *)
-    | Cast of pos * types * expr
-    (** assigne expr *)
-    | Assign of pos * vars * expr
-    (** Appel d'une méthode, les paramètres sont stockés dans la liste *)
-    | Call of pos * vars * expr list
-    (** Accès a une variable (au sens large) *)
-    | Getval of pos * vars  
-    (** expression booléene, vrai si expr est une instance de types *)
-    | Instanceof of pos * expr * types
-    (** opérateur d'instanciation de la classe ident
-        les paramètres du constructeur sont pasés sous forme de liste *)
-    | New of pos * ident * expr list 
+(** Repérsente la grammaire des instructions *)
+type instruction  = 
+  | Expr of expr (* pas besoin de pos, c'est la même que celle de l'expression *)
+  (** Déclaration d'une variable, avec éventuellement une initialisation
+      Le paramètre de type expr option contient l'initialisation éventuelle *)
+  | Decl of pos * types * ident * expr option
+  (** Branchement conditionnel, s'il y a une clause "else", elle se trouve dans le paramètre optionnel *)
+  | If of  expr * instruction * instruction option
+  (**Boucle for, sémantique classique *)
+  | For of expr option * expr option * expr option * instruction option
+  | Block of instruction list
+  (** Expression optionnelles, pour les méthodes void *)
+  | Return of expr option
 
-  (** Repérsente la grammaire des instructions *)
-  type instruction  = 
-    | Expr of expr (* pas besoin de pos, c'est la même que celle de l'expression *)
-    (** Déclaration d'une variable, avec éventuellement une initialisation
-        Le paramètre de type expr option contient l'initialisation éventuelle *)
-    | Decl of pos * types * ident * expr option
-    (** Branchement conditionnel, s'il y a une clause "else", elle se trouve dans le paramètre optionnel *)
-    | If of  expr * instruction * instruction option
-    (**Boucle for, sémantique classique *)
-    | For of expr option * expr option * expr option * instruction option
-    | Block of instruction list
-    (** Expression optionnelles, pour les méthodes void *)
-    | Return of expr option
+(** Les variables associèes à leur type *)
+type variable = {v_type : types ; v_name : ident }
 
-  (** Les variables associèes à leur type *)
-  type variable = types * ident
-  (** les méthodes et constructeurs *)
-  type callable = {
-    call_pos : pos;
-    call_returnType : types;
-    call_name : ident;
-    call_params : variable list;
-    call_body : instruction list;
-  }
-      
-  (** représentation d'une classe *)
-  type classe = {
-    class_pos : pos ;
-    (** Le nom de la classe*)
-    class_name : ident ;
-    (** Liste des relations d'héritages *)
-    class_extends : (ident * pos) option;
-    (** Les attributs, sous forme de paires *)
-    class_attrs : (variable * pos) list;
-    (** les constructeurs (ils peuvent être surchargés), le champ returnType est toujours nul*)
-    class_consts : callable list;
-    (** la liste des méthodes, pouvant avoir des noms identiques *)
-    class_methods : callable list;
-  }
+(** les méthodes et constructeurs *)
+type callable = {
+  call_pos : pos;
+  call_returnType : types;
+  call_name : ident;
+  call_params : variable list;
+  call_body : instruction list;
+}
+    
+(** représentation d'une classe *)
+type classe = {
+  class_pos : pos ;
+  (** Le nom de la classe*)
+  class_name : ident ;
+  (** Liste des relations d'héritages *)
+  class_extends : (ident * pos) option;
+  (** Les attributs, sous forme de paires *)
+  class_attrs : (variable * pos) list;
+  (** les constructeurs (ils peuvent être surchargés), le champ returnType est toujours nul*)
+  class_consts : callable list;
+  (** la liste des méthodes, pouvant avoir des noms identiques *)
+  class_methods : callable list;
+}
 
-  (* utile à l'intérieur du parser *)
-  type classouinstr = Class of classe | Instr of instruction list
-
-  (** representation d'un programme petit java *)
-  type prog = {
-    (** liste des classes *)
-    classes : classe list ;
-    (** liste des instructions dans main*)
-    instr : instruction list ;
-  }
+(** representation d'un programme petit java *)
+type prog = {
+  (** liste des classes *)
+  classes : classe list ;
+  (** liste des instructions dans main*)
+  instr : instruction list ;
+}
 
 end
 
 
+(** syntaxe issue de l'analyse et du typage des classes *) 
+module Oast = struct 
+  include Past 
+    
+  (** représentation d'une classe *)
+  type classe = {
+    oclass_pos : pos ;
+    (** Le nom de la classe*)
+    oclass_name : ident ;
+    (** relations d'héritages *)
+    oclass_extends : (ident * pos) option;
+    (** Les attributs, sous forme d'une Map qui à chacun associe une variable *)
+    oclass_attrs : variable Cmap.t;
+    (** les constructeurs (ils peuvent être surchargés), le champ returnType est toujours nul*)
+    oclass_consts : callable list;
+    (** la Map des méthodes, pouvant avoir des noms identiques *)
+    oclass_methods : callable list Cmap.t;
+  }
 
-
-
+  type prog = {
+    (** Map des classes *)
+    oclasses : classe Cmap.t ;
+    (** liste des instructions dans main*)
+    oinstr : instruction list ;
+}
+end
 
 (** Syntaxe issue de l'analyse de portée et du typage *)
 module Sast = struct
@@ -156,26 +178,25 @@ module Sast = struct
     | SPlus | SMinus | SStar | SDiv 
     | SMod 
     | SAnd | SOr
-     
-
-  (** Opérateurs unaires prefixes et postfixes sur les expressions *)
-  type prefpost = SIncr | SDecr   
+        
+  (** Opérateurs unaires sur les expressions *)
+  type unaire =
+    | SIncr | SDecr
+    | SNot
+    | SUMinus
         
   (** Appels à des variables, méthodes, et attributs *)
   type vars =
     | SVar of ident
-    | SAttr of vars * ident 
+    | SAttr of expr * ident 
 
   (** Représente la grammaire des expressions, le premier paramètre de chaque constructeur est la position *)
-  type expr_v = 
+  and expr_v = 
     | SIconst of int 
     | SSconst of string 
-    | SBconst of bool
+    | SBconst of bool 
     | SNull
-    | SNot of expr
-    | SUMinus of expr
-    | SPref of prefpost * vars
-    | SPost of prefpost * vars
+    | SUnaire of unaire * expr 
     | SBinaire of binaire * expr * expr 
     (** caste l'expression *)
     | SCast of stypes * expr 

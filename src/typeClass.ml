@@ -1,13 +1,20 @@
 (** Typage statique *)
-open Ast.Past
-open Ast.Sast
+open Ast
 
-module Cmap = Map.Make(String)
 module Cset = Set.Make(String)
 
 
 (** L'ensemble des exceptions de l'analyse sémantique *)
-module Exceptions = struct
+module Exceptions = struct 
+  open Sast
+
+  (** Convertit un type Past vers un type Sast *)
+  let types_to_Sast = function
+    | Past.Void -> SVoid
+    | Past.Bool -> SBool
+    | Past.Int -> SInt
+    | Past.C(s) -> SC(s)
+
   (** Classe déjà définie (position, ident, position de la définition antèrieure *)
   exception AlreadyDefined of pos * string * pos
      
@@ -15,32 +22,164 @@ module Exceptions = struct
   exception Undefined of pos * string
       
   (** erreur d'Héritage *)
-  exception Her of pos * string * string
-      
+  exception Her of pos * ident * string
+     
   (** mauvais type, optionnellement le type attendu *)
-  exception WrongType of pos * stypes * stypes option
-
-  (** pas une valeur gauche *)
-  exception NotALeftValue of pos
+  exception WrongType of pos * types * types option
+      
+  (** Utilisation du même nom plusieurs fois *)
+  exception Duplicated of pos * string
 
 end
 
-(*  
-(** Définition des classes et vérification d'unicité *)
+  
+(** Définition des classes et vérification d'unicité
+    Passe d'ub arbre Past à un arbre Oast *)
 module ClassAnalysis = struct
   open Exceptions
-
+  open Oast
+  open Past 
+    
   (** construit une Map de classes en vérifiant l'unicité du nommage *)
   let buildClassMap prog =
     let addClass map c =
       if Cmap.mem c.class_name map then
 	let c1 = Cmap.find c.class_name map in
-	raise (AlreadyDefined (c.class_pos,c.class_name,c1.class_pos))
+	raise (AlreadyDefined (c.class_pos,c.class_name,  c1.class_pos))
       else
 	Cmap.add c.class_name c map in
     List.fold_left addClass Cmap.empty prog.classes 
+   
 
-  (** vérifie que l'héritage est correct et cohérent (aka sans cycle) *)
+  (** calcule si une classe c1 hérite d'une autre classe c2 *)
+  let rec isSubClass classes c1 c2 =
+    match c1.class_extends with
+      | None -> if c2.class_name = "Object" then true else false
+      | Some (extends,_) ->
+        if c2.class_name = extends then true
+        else
+          match c2.class_extends with
+            | None -> false
+	    | Some (c,_) -> isSubClass classes c1 (Cmap.find c classes)
+
+  
+  (** calcul si t1 est un sous type de t2 *)
+  let isSubType classes t1 t2 = 
+    match t1,t2 with
+      | STypeNull,_ -> true
+      | SBool,_ | SInt,_ -> (t1 = t2)
+      | (SC i1),(SC i2) -> isSubClass (Cmap.find i1 classes) (Cmap.find i2 classes)
+      | _ -> false
+
+
+  (** vérifie si le type est bien formé *)
+  let isBF classes = function
+    | Int | Bool -> true
+    | C "Object" | C "String" -> true
+    | C c -> Cmap.mem c classes
+  
+      
+  (** vérfie l'unicité des champs et que leurs types soient bien formés
+      renvoit la map des attributs *)
+  let checkAttr classes c = 
+    let aux accmap  attr = 
+      let name = attr.v_name in
+      if Cmap.mem name accmap then 
+	let a = Cmap.find name accmap in
+	raise (AllreadyDefined( attr.pos,name, a.pos))
+      else
+	if not (isBF classes attr.v_type) then 
+	  raise (WrongType( attr.pos,types_to_Sast attr.v_type,None))
+	else
+	  Cmap.add name attr accmap
+    in
+    List.fold_left aux Cmap.empty c.attrs 
+      
+  (** vérifie qu'un profil prend bien une liste d'arguments de noms différents 
+      renvoit un booléen *)
+  let isBFCall call = 
+    let accSet = ref Cset.empty in
+      let checkParams v = 
+	if Cset.mem v.v_name !accSet then 
+	  (raise (AllreadyDefined ( call.call_pos, v.v_name)))
+	else 
+	  begin
+	    if (isBF classes v.v_type ) then
+	      (accSet := (Cset.add v.v_name !accSet) ; true)
+	    else
+		(raise (WrongType( call.call_pos, types_to_Sast v.v_type ,None)))
+	  end
+      in
+      List.for_all checkParams call.call_params
+	
+  (** Vérifie que call et tout les élements de la liste ont des profils différents et des types de retour identiques *)
+  let isDiff list call = 
+    (* compare deux profils *)
+    let comp  c2 = 
+      try
+	List.for_all2 (fun v1 v2 -> v1.v_type != v2.v_type) call.call_params c2.call_params
+      with  Invalid_argument -> true
+    in 
+    let forAll c =
+      if comp c then
+	(if call.call_returnType = c.call_returnType then
+	    true
+	 else
+	    (raise (WrongType(c.call_pos, c.call_returnType, call.call_returnType))))
+      else
+	(raise (AllreadyDefined(call.call_pos, call.call_name,c.call_pos)))
+    in
+    (* on compare tout avec les profils *)
+    if List.for_all  forAll liste then 
+      try 
+	List.tl liste 
+      with Failure _ -> []
+    else
+      false
+
+	
+  (** vérifie les constructeurs, renvoit () si aucune exception n'est levée*)
+  let checkConst classes c =
+    (* vérifie que tout les constructeurs ont des profils différents *)    
+    if List.for_all isBFCall c.class_consts  then
+      let tail = 
+	try
+	  List.tl c.class_consts 
+	with Failure _ -> []
+      and _ = List.fold_left isDiff tail c.class_consts 
+      in
+      ()
+    else
+      ()
+
+  (** construit une Map des méthodes de la classe en vérifiant que tout est correct *)
+  let checkMethods  classes c =
+    (* On vérifie que toutes les méthodes ont des profils bien formés *)
+    let _ = List.for_all  isBFCall c.class_methods in
+    (* on construit d'abord une Map*)
+    let bMap acc m = 
+      let l =
+	try 
+	  Cmap.find m.call_name acc 
+	with Not_found -> []
+      in
+      Cmap.add m.call_name (m::l) acc 
+    in
+    let mMap = List.fold_left bMap Cmap.empty c.class_methods in
+    (* on vérifie les méthodes polymorphes  *)
+    let _ = Cmap.iter (fun _ l -> 
+      let tail = 
+	try 
+	  List.tl l 
+	with Failure _ -> []
+      and _ = List.fold_left isDiff tail l 
+      in () ) mMap 
+    in
+    mMap 
+      
+
+  (** vérifie que l'héritage est sans cycle
+      vérifie que les méthodes redéfinies ont le même type de retour *)
   let checkHerit cmap =
     (** parcourt les parents de le classe
 	@param c la classe à partir de laquelle on parcourt
@@ -54,9 +193,8 @@ module ClassAnalysis = struct
 	  raise (Her(c.class_pos,c.class_name,"Cycle")) 
 	else
 	  match c.class_extends with
-            | None -> failwith "dfsVisit : doit-on déjà hériter au moins de Object ?"
+            | None -> graySet
 	    | Some ("String" , pos) -> raise (Her(pos,c.class_name,"Cannot herite of string"))
-	    | Some ("Object", _) -> graySet
 	    | Some (c1name, pos) -> 
 	      let c1 = 
 		try 
@@ -65,158 +203,55 @@ module ClassAnalysis = struct
 	      in
 	      dfsVisit c1 (Cset.add c1name graySet) blackSet
     in
-    Cmap.fold (fun _ c black -> Cset.union (dfsVisit c Cset.empty black) black) cmap Cset.empty    
-end
+    Cmap.fold (fun _ c black -> Cset.union (dfsVisit c Cset.empty black) black) cmap Cset.empty 
 
-module CheckClass = struct
-  open Exceptions
+end	
+
+(** typage des expressions et des instructions *)
+module  CheckInstr = struct 
+    
   open Past
   open Sast
-
-  (** calcule si une classe c1 hérite d'une autre classe c2 *)
-  let rec isSubClass classes c1 c2 =
-    match c1.class_extends with
-      | None -> failwith "Horreur en isSubClass"
-      | Some (extends,_) ->
-        if c2.class_name = extends then true
-        else
-          match c2.class_extends with
-            | None -> failwith "Horreur en isSubClass"
-            | Some ("Object", _) -> false
-	    | Some (c,_) -> isSubClass classes c1 (Cmap.find c classes)
-
-  
-  (** calcul si t1 est un sous type de t2 *)
-  let isSubType classes t1 t2 = 
-    match t1,t2 with
-      | STypeNull,_ -> true
-      | SBool,_ | SInt,_ -> (t1 = t2)
-      | (SC i1),(SC i2) -> isSubClass (Cmap.find i1 classes) (Cmap.find i2 classes) (* erreur d'utilisation de isSubClass *)
-
-  (** calcule si un profil de type p1 est un sous profil de p2*)      
-  let profIsSubType cmap p1 p2 = 
-    List.for_all2 (isSubType  cmap ) p1 p2 
-
-  (** vérifie si le type est bien formé *)
-  let isBF classes = function
-    | Int | Bool -> true
-    | C "Object" | C "String" -> true
-    | C c -> Cmap.mem c classes
-      
-  (** vérfie l'unicité des champs et que leurs types sont bien formés
-      renvoit la map des atributs *)
-  let checkAttr classes c = 
-    let aux accmap  attr = 
-      let name = attr.v_name in
-      if Cmap.mem name accmap then 
-	let a = Cmap.find name accmap in
-	raise (AllreadyDefined(attr.pos,name,a.pos))
-      else
-	if not (isBF classes attr.v_type) then 
-	  raise (WrongType(attr.pos,attr.v_type,None))
-	else
-	  Cmap.add name attr accmap
-    in
-    List.fold_left aux Cmap.empty c.attrs 
-      
-  (** vérifie les constructeurs *)
-  (**let checkConst *)
-end	
-*)
-module  CheckInstr = struct 
-
-  open Exceptions
+  open Exception
 
   let isLeft = function
     | Getval _ -> true
     | _ -> false
-
-  let traduct_opUn = function Incr -> SIncr | Decr -> SDecr
 
   let rec typExpr env = function
     | Iconst (p,i) -> { sv = SIconst i ; st = SInt ; sp = p }
     | Sconst (p,i) -> { sv = SSconst i ; st = SC ("String") ; sp = p }
     | Bconst (p,i) -> { sv = SBconst i ; st = SBool ; sp = p }
     | Null p -> { sv = SNull ; st = STypeNull ; sp = p }
-    | Not (p,e) ->
+    | Unaire (p, op, e) ->
       let se = typExpr env e in
-      if se.st = SBool then { sv = SNot se ; st = SBool ; sp = p }
-      else raise (WrongType (se.sp, se.st, Some SBool))
-    | UMinus (p,e) ->
-      let se = typExpr env e in
-      if se.st = SInt then { sv = SUMinus se ; st = SInt ; sp = p }
-      else raise (WrongType (se.sp, se.st, Some SInt))
-    | Pref (p, op, e) ->
-      let se = typExpr env e in
-      begin
-      match se.sv with
-        | SGetval a ->
-          if se.st = SInt then
-            { sv = SPref (traduct_opUn op, a) ; st = SInt ; sp = p }
+      let sop = match op with
+        | Incr ->
+          if se.st = SInt then SIncr
           else raise (WrongType (se.sp, se.st, Some SInt))
-        | _ -> raise (NotALeftValue se.sp)
-      end
-    | Post (p, op, e) ->
-      let se = typExpr env e in
-      begin
-      match se.sv with
-        | SGetval a ->
-          if se.st = SInt then
-            { sv = SPost (traduct_opUn op, a) ; st = SInt ; sp = p }
+        | Decr ->
+          if se.st = SInt then SDecr
           else raise (WrongType (se.sp, se.st, Some SInt))
-        | _ -> raise (NotALeftValue se.sp)
-      end
+        | Not ->
+          if se.st = SBool then SNot
+          else raise (WrongType (se.sp, se.st, Some SBool))
+        | UMinus ->
+          if se.st = SInt then SUMinus
+          else raise (WrongType (se.sp, se.st, Some SInt))
+      in
+      { sv = SUnaire (sop, se) ; st = se.st ; sp = p }
     | Binaire (p, op, e1, e2) ->
       let se1 = typExpr env e1 in
       let se2 = typExpr env e2 in
       (* à modifier pour faire les vérifs de types *)
-      let sop , typ_retour = match op with
-        | Eq | Neq -> failwith "Not implemented"
-        | Leq | Geq | Lt | Gt ->
-          if se1.st = SInt then
-            if se2.st = SInt then
-              begin
-                match op with
-                  | Leq -> SLeq | Geq -> SGeq | Lt -> SLt | Gt -> SGt
-                  | _ -> failwith "Erreur 42"
-              end , SBool
-            else raise (WrongType (se2.sp, se2.st, Some SInt))
-          else raise (WrongType (se1.sp, se1.st, Some SInt))
-        | Plus ->
-          if se1.st = SC "String" or se2.st = SC "String" then
-            if se1.st = SInt or se1.st = SC "String" then
-              if se2.st = SInt or se2.st = SC "String" then
-                SPlus, SC "String"
-              else raise (WrongType (se2.sp, se2.st, None))
-            else raise (WrongType (se1.sp, se1.st, None))
-          else if se1.st = SInt then
-            if se2.st = SInt then
-              SPlus, SInt
-            else raise (WrongType (se2.sp, se2.st, None))
-          else raise (WrongType (se1.sp, se1.st, None))
-        | Minus | Star | Div | Mod ->
-          if se1.st = SInt then
-            if se2.st = SInt then
-              begin
-                match op with
-                  | Minus -> SMinus
-                  | Star -> SStar | Div -> SDiv | Mod -> SMod
-                  | _ -> failwith "Erreur 42"
-              end , SInt
-            else raise (WrongType (se2.sp, se2.st, Some SInt))
-          else raise (WrongType (se1.sp, se1.st, Some SInt))
-        | And | Or ->
-          if se1.st = SBool then
-            if se2.st = SBool then
-              begin
-                match op with
-                  | And -> SAnd | Or -> SOr
-                  | _ -> failwith "Erreur 42"
-              end , SBool
-            else raise (WrongType (se2.sp, se2.st, Some SBool))
-          else raise (WrongType (se1.sp, se1.st, Some SBool))
+      let sop = match op with
+        | Eq -> SEq | Neq -> SNeq | Leq -> SLeq | Geq -> SGeq
+        | Lt -> SLt | Gt -> SGt
+        | Plus -> SPlus | Minus -> SMinus | Star -> SStar | Div -> SDiv
+        | Mod -> SMod
+        | And -> SAnd | Or -> SOr
       in
-      { sv = SBinaire (sop, se1, se2) ; st = typ_retour ; sp = p }
+      { sv = SBinaire (sop, se1, se2) ; st = se1.st ; sp = p }
     | Getval (p,Var "this") -> (
       try let t = Cmap.find "this" env in
 	  { sv = SGetval (SVar { id_id = "this" ; id_typ = t} ) ;
