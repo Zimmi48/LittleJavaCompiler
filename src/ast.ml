@@ -180,6 +180,7 @@ module Sast = struct
   (** Valeurs gauches *)
   type vars =
     | SVar of ident
+    (** le nom de la classe * le numéros de l'attribut *)
     | SAttr of string * int 
 
   (** les méthodes et constructeurs *)
@@ -244,7 +245,7 @@ module Sast = struct
     (** Liste des relations d'héritages *)
     sclass_extends : (ident * pos) option;
     (** Les attributs, sous forme de paires *)
-    sclass_attrs : ident Cmap.t
+    sclass_attrs : ident array
     (** les constructeurs (ils peuvent être surchargés), le champ returnType est toujours nul*)
     sclass_consts : callable array;
     (** la liste des méthodes, pouvant avoir des noms identiques *)
