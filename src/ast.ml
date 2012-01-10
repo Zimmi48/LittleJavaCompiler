@@ -226,7 +226,7 @@ module Sast = struct
     | SInstanceof of expr * stypes 
     (** opérateur d'instanciation de la classe ident
         les paramètres du constructeur sont pasés sous forme de liste *)
-    | SNew of ident * expr list
+    | SNew of ident * int * expr list
     (** System.print.out(e) *)
     | SPrint of expr 
 
