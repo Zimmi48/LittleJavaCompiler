@@ -191,8 +191,8 @@ module Sast = struct
   (** Valeurs gauches *)
   type vars =
     | SVar of ident
-    (** le nom de la classe * le numéros de l'attribut *)
-    | SAttr of string * int 
+    (** le ident de la classe * le numéros de l'attribut *)
+    | SAttr of ident * int 
 
   (** les méthodes et constructeurs *)
   type callable = {
@@ -219,7 +219,7 @@ module Sast = struct
     (** assigne expr *)
     | SAssign of vars * expr 
     (** Appel d'une méthode, les paramètres sont stockés dans la liste *)
-    | SCall of string * int * expr list 
+    | SCall of ident * int * expr list 
     (** Accès a une variable (au sens large) *)
     | SGetval of vars 
     (** expression booléene, vrai si expr est une instance de types *)
