@@ -139,7 +139,7 @@ module Oast = struct
   include Past 
 
   (** les méthodes et constructeurs *)
-  type callable = {
+  type ocallable = {
     ocall_pos : pos;
     (* identifiant unique, plus tard n° dans l'entrée du tableau *)
     ocall_id : int ; 
@@ -150,7 +150,7 @@ module Oast = struct
   }
     
   (** représentation d'une classe *)
-  type classe = {
+  type oclasse = {
     oclass_pos : pos ;
     (** Le nom de la classe*)
     oclass_name : ident ;
@@ -159,19 +159,19 @@ module Oast = struct
     (** Les attributs, sous forme d'une Map qui à chacun associe une variable *)
     oclass_attrs : variable Cmap.t;
     (** les constructeurs (ils peuvent être surchargés), le champ returnType est toujours nul*)
-    oclass_consts : callable list;
+    oclass_consts : ocallable list;
     (** Nombre de constructeurs *)
     oclass_cn : int;
     (** la Map des méthodes, pouvant avoir des noms identiques *)
-    oclass_methods : callable list Cmap.t;
+    oclass_methods : (ocallable list) Cmap.t;
     (** nombre de méthodes *)
     oclass_cm : int ;
     
   }
 
-  type prog = {
+  type oprog = {
     (** Map des classes *)
-    oclasses : classe Cmap.t ;
+    oclasses : oclasse Cmap.t ;
     (** liste des instructions dans main*)
     oinstr : instruction list ;
 }
@@ -191,21 +191,21 @@ module Sast = struct
     | SC of string
 
   (** Les idents contiennent les infos de typage *)
-  type ident = { id_id : string; id_typ : stypes }
+  type sident = { id_id : string; id_typ : stypes }
         
   (** Valeurs gauches *)
-  type vars =
-    | SVar of ident
+  type svars =
+    | SVar of sident
     (** le expr de la classe * l'ident de l'attribu *)
-    | SAttr of expr * ident 
+    | SAttr of sexpr * sident 
 
   (** les méthodes et constructeurs *)
-  type callable = {
+  and scallable = {
     scall_pos : pos;
     scall_returnType : stypes;
     scall_name : string;
-    scall_params : ident list;
-    scall_body : instruction list;
+    scall_params : sident list;
+    scall_body : sinstruction list;
   }
 
   (** Représente la grammaire des expressions, le premier paramètre de chaque constructeur est la position *)
@@ -214,66 +214,66 @@ module Sast = struct
     | SSconst of string 
     | SBconst of bool 
     | SNull
-    | SNot of expr
-    | SUMinus of expr
-    | SPref of prefpost * vars
-    | SPost of prefpost * vars
-    | SBinaire of binaire * expr * expr 
+    | SNot of sexpr
+    | SUMinus of sexpr
+    | SPref of prefpost * svars
+    | SPost of prefpost * svars
+    | SBinaire of binaire * sexpr * sexpr 
     (** caste l'expression *)
-    | SCast of stypes * expr 
+    | SCast of stypes * sexpr 
     (** assigne expr *)
-    | SAssign of vars * expr 
+    | SAssign of svars * sexpr 
     (** Appel d'une méthode, les paramètres sont stockés dans la liste *)
-    | SCall of expr * int * expr list 
+    | SCall of sexpr * int * sexpr list 
     (** Accès a une variable (au sens large) *)
-    | SGetval of vars 
+    | SGetval of svars 
     (** expression booléene, vrai si expr est une instance de types *)
-    | SInstanceof of expr * stypes 
+    | SInstanceof of sexpr * stypes 
     (** opérateur d'instanciation de la classe ident
         les paramètres du constructeur sont pasés sous forme de liste *)
-    | SNew of ident * int * expr list
+    | SNew of sident * int * sexpr list
     (** System.print.out(e) *)
-    | SPrint of expr 
+    | SPrint of sexpr 
 
-  and expr = { sv : expr_v; st : stypes ; sp : pos }
+  and sexpr = { sv : expr_v; st : stypes ; sp : pos }
 
   (** Repérsente la grammaire des instructions *)
-  type instruction  = 
-    | SExpr of expr (* pas besoin de pos, c'est la même que celle de l'expression *)
+  and sinstruction  = 
+    | SExpr of sexpr (* pas besoin de pos, c'est la même que celle de l'expression *)
     (** Déclaration d'une variable, avec éventuellement une initialisation
         Le paramètre de type expr option contient l'initialisation éventuelle *)
-    | SDecl of pos * stypes * ident * expr option
+    | SDecl of pos * stypes * sident * sexpr option
     (** Branchement conditionnel, s'il y a une clause "else", elle se trouve dans le paramètre optionnel *)
-    | SIf of  expr * instruction * instruction option
+    | SIf of  sexpr * sinstruction * sinstruction option
     (**Boucle for, sémantique classique *)
-    | SFor of expr option * expr * expr option * instruction option
-    | SBlock of instruction list
+    | SFor of sexpr option * sexpr * sexpr option * sinstruction option
+    | SBlock of sinstruction list
     (** Expression optionnelles, pour les méthodes void *)
-    | SReturn of expr option
+    | SReturn of sexpr option
 
 
       
   (** représentation d'une classe *)
-  type classe = {
+  type sclasse = {
     sclass_pos : pos ;
     (** Le nom de la classe*)
     sclass_name : string ;
     (** Liste des relations d'héritages *)
-    sclass_extends : (ident * pos) option;
+    sclass_extends : (sident * pos) option;
     (** Les attributs, sous forme de paires *)
-    sclass_attrs : ident Cmap.t
+    sclass_attrs : sident Cmap.t;
     (** les constructeurs (ils peuvent être surchargés), le champ returnType est toujours nul*)
-    sclass_consts : callable array;
+    sclass_consts : scallable array;
     (** le tableau des méthodes *)
-    sclass_methods : callable array;
+    sclass_methods : scallable array;
   }
 
   (** representation d'un programme petit java *)
-  type prog = {
+  type sprog = {
     (** liste des classes *)
-    sclasses : classe Cmap.t ;
+    sclasses : sclasse Cmap.t ;
     (** liste des instructions dans main*)
-    sinstr : instruction list ;
+    sinstr : sinstruction list ;
   }
 
 end
