@@ -6,13 +6,18 @@ let compile_program p ofile =
   let string_nb = ref 0 in
   let soi = string_of_int in
   let int_of_bool = function true -> 1 | false -> 0 in
-  let data = ref [Word ("null", 0)] in (* l'adresse de NULL *)
+  let data = ref [Word ("null", 0)] (* l'adresse de NULL *)
+  in
+  (* calcule l'adresse de var en utilisant la pile, stocke le
+           résultat dans A0 *)
+  (* les instructions compilées sont placées devant l'accumulateur acc *)
   let rec compile_vars var acc = match var with
     | SVar { id_id = id } -> failwith "Not implemented"
     | SAttr (var, id) -> failwith "Not implemented"
-  (* calcule en utilisant la pile, et stocke le résultat dans A0 *)
-  (* les instructions compilées sont placées devant l'accumulateur acc *)
   in
+  (* calcule en utilisant la pile et les registres A0 et A1,
+     stocke le résultat dans A0 *)
+  (* les instructions compilées sont placées devant l'accumulateur acc *)
   let rec compile_expr expr acc = match expr.sv with
     | SIconst i -> Li (A0, i) :: acc
     | SSconst s ->
@@ -24,9 +29,24 @@ let compile_program p ofile =
     | SNull -> La (A0, "null") :: acc
     | SNot e -> compile_expr e (Arith (Eq, A0, A0, Oimm 0) :: acc)
     | SUMinus e -> compile_expr e (Neg (A0, A0) :: acc)
-(*    | SPref (op, var) ->
+    | SPref (op, var) ->
       compile_vars var (
-    | SPost *)
+        Move (T0, A0) ::
+          Lw (A0, Areg (0, T0)) ::
+          Arith ( begin match op with SIncr -> Add | SDecr -> Sub end ,
+            A0, A0, Oimm 1 ) ::
+          Sw (A0, Areg (0, T0)) :: acc )
+        (* la nouvelle valeur est replacée à l'adresse indiquée par T0
+           et reste dans A0 en tant que valeur de retour *)
+    | SPost (op, var) ->
+      compile_vars var (
+        Move (T0, A0) ::
+          Lw (A0, Areg (0, T0)) ::
+          Arith ( begin match op with SIncr -> Add | SDecr -> Sub end ,
+            T1, A0, Oimm 1 ) ::
+          Sw (T1, Areg (0, T0)) :: acc )
+        (* la nouvelle valeur est replacée à l'adresse indiquée par T0 et
+           l'ancienne valeur reste dans A0 en tant que valeur de retour *)
     | SBinaire (op, e1, e2) ->
       (* surcharge des opérateurs non gérées :
          seulement fonctionne avec les ints et bool *)

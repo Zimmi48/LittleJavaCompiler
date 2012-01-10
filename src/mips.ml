@@ -1,7 +1,7 @@
 (* à partir d'un fichier de J-C. Filliâtre *)
 
 type register = 
-  | A0 | A1 | V0 | S0 | RA | SP | FP
+  | A0 | A1 | V0 | T0 | T1 | S0 | RA | SP | FP
 
 type address =
   | Alab of string
@@ -43,6 +43,8 @@ let print_register fmt = function
   | A0 -> pp_print_string fmt "$a0"
   | A1 -> pp_print_string fmt "$a1"
   | V0 -> pp_print_string fmt "$v0"
+  | T0 -> pp_print_string fmt "$t0"
+  | T1 -> pp_print_string fmt "$t1"
   | S0 -> pp_print_string fmt "$s0"
   | RA -> pp_print_string fmt "$ra"
   | SP -> pp_print_string fmt "$sp"
