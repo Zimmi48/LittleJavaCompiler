@@ -7,8 +7,12 @@ let compile_program p ofile =
   let soi = string_of_int in
   let int_of_bool = function true -> 1 | false -> 0 in
   let data = ref [Word ("null", 0)] in (* l'adresse de NULL *)
+  let rec compile_vars var acc = match var with
+    | SVar { id_id = id } -> failwith "Not implemented"
+    | SAttr (var, id) -> failwith "Not implemented"
   (* calcule en utilisant la pile, et stocke le résultat dans A0 *)
   (* les instructions compilées sont placées devant l'accumulateur acc *)
+  in
   let rec compile_expr expr acc = match expr.sv with
     | SIconst i -> Li (A0, i) :: acc
     | SSconst s ->
@@ -20,7 +24,9 @@ let compile_program p ofile =
     | SNull -> La (A0, "null") :: acc
     | SNot e -> compile_expr e (Arith (Eq, A0, A0, Oimm 0) :: acc)
     | SUMinus e -> compile_expr e (Neg (A0, A0) :: acc)
-    (* SPref / SPost *)
+(*    | SPref (op, var) ->
+      compile_vars var (
+    | SPost *)
     | SBinaire (op, e1, e2) ->
       (* surcharge des opérateurs non gérées :
          seulement fonctionne avec les ints et bool *)
@@ -65,6 +71,22 @@ let compile_program p ofile =
               (* rajouter les comparaisons généralisées et la concaténation 
                  de chaînes *)
               end ) )
+    | SCall (m, args) ->
+      begin
+      match m with
+          SAttr (
+            SAttr ( SVar { id_id = "System" } , { id_id = "out" } ) ,
+            { id_id = "print" } ) ->
+            begin
+            match args with
+              | [e] ->
+                  compile_expr e (
+                    Jal "print" ::
+                      acc )
+              | _ -> failwith "Typage mal fait"
+            end
+        | _ -> failwith "Not implemented"
+      end
     | _ -> failwith "Not implemented"
   in
   let rec compile_instr instr acc = match instr with

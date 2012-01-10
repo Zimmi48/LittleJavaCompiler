@@ -57,7 +57,6 @@ module Past = struct
     | Sconst of pos * string
     | Bconst of pos * bool
     | Null of pos
-(* CODE MORT   | Unaire of pos * unaire * expr*)
     | Not of pos * expr
     | UMinus of pos * expr
     | Pref of pos * prefpost * expr
@@ -165,10 +164,10 @@ module Sast = struct
   (** Appels à des variables, méthodes, et attributs *)
   type vars =
     | SVar of ident
-    | SAttr of expr * ident 
+    | SAttr of vars * ident 
 
   (** Représente la grammaire des expressions, le premier paramètre de chaque constructeur est la position *)
-  and expr_v = 
+  type expr_v = 
     | SIconst of int 
     | SSconst of string 
     | SBconst of bool

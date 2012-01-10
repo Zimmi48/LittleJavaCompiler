@@ -70,9 +70,9 @@ let () =
     | Ast.Sast.STypeNull -> "Type Null"
   in  
   try
-    (* Parsing: la fonction  Parser.fichier transforme le tampon lexical en un 
-       arbre de syntaxe abstraite si aucune erreur (lexicale ou syntaxique) 
-       n'est détectée.
+    (* Parsing: la fonction  Parser.fichier transforme le tampon lexical en
+       un arbre de syntaxe abstraite si aucune erreur (lexicale ou
+       syntaxique) n'est détectée.
        La fonction Lexer.token est utilisée par Parser.prog pour obtenir 
        le prochain token. *)
     let p = Parser.fichier Lexer.token buf in
@@ -142,6 +142,11 @@ let () =
     | TypeClass.Exceptions.NotALeftValue pos ->
       localisationBis pos ;
       eprintf "Erreur : Ceci n'est pas une valeur gauche@." ;
-    | _ -> exit 2 ;
+    | Failure s ->
+      eprintf "Erreur du compilateur : %s@." s ;
+      exit 2 ;
+    | _ ->
+      eprintf "Erreur indéterminée@." ;
+      exit 2 ;
 
 
