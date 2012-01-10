@@ -155,7 +155,7 @@ module Oast = struct
     (** Le nom de la classe*)
     oclass_name : ident ;
     (** relations d'héritages *)
-    oclass_extends : (ident * pos) option;
+    oclass_extends : (ident*pos) option;
     (** Les attributs, sous forme d'une Map qui à chacun associe une variable *)
     oclass_attrs : variable Cmap.t;
     (** les constructeurs (ils peuvent être surchargés), le champ returnType est toujours nul*)
@@ -259,7 +259,7 @@ module Sast = struct
     (** Le nom de la classe*)
     sclass_name : string ;
     (** Liste des relations d'héritages *)
-    sclass_extends : (sident * pos) option;
+    sclass_extends : sident option;
     (** Les attributs, sous forme de paires *)
     sclass_attrs : sident Cmap.t;
     (** les constructeurs (ils peuvent être surchargés), le champ returnType est toujours nul*)
