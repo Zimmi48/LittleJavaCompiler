@@ -180,7 +180,7 @@ module Sast = struct
   (** Valeurs gauches *)
   type vars =
     | SVar of ident
-    | SAttr of expr * ident 
+    | SAttr of string* int * ident 
 
   (** les méthodes et constructeurs *)
   type callable = {
