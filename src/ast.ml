@@ -38,8 +38,8 @@ module Past = struct
   exception PasUnType of pos
   exception CommentaireNonTermine
 
-(** Les idents sont des chaines *)
-type ident = string
+  (** Les idents sont des chaines *)
+  type ident = string
   
 (** Représentation des types de Petit Java *)
 type types =
@@ -157,11 +157,16 @@ module Oast = struct
     (** relations d'héritages *)
     oclass_extends : (ident * pos) option;
     (** Les attributs, sous forme d'une Map qui à chacun associe une variable *)
-    oclass_attrs : (variable * int) Cmap.t;
+    oclass_attrs : variable Cmap.t;
     (** les constructeurs (ils peuvent être surchargés), le champ returnType est toujours nul*)
     oclass_consts : callable list;
+    (** Nombre de constructeurs *)
+    oclass_cn : int;
     (** la Map des méthodes, pouvant avoir des noms identiques *)
     oclass_methods : callable list Cmap.t;
+    (** nombre de méthodes *)
+    oclass_cm : int ;
+    
   }
 
   type prog = {
@@ -191,8 +196,8 @@ module Sast = struct
   (** Valeurs gauches *)
   type vars =
     | SVar of ident
-    (** le expr de la classe * le numéros de l'attribut *)
-    | SAttr of expr * int 
+    (** le expr de la classe * l'ident de l'attribu *)
+    | SAttr of expr * ident 
 
   (** les méthodes et constructeurs *)
   type callable = {
@@ -241,7 +246,7 @@ module Sast = struct
     (** Branchement conditionnel, s'il y a une clause "else", elle se trouve dans le paramètre optionnel *)
     | SIf of  expr * instruction * instruction option
     (**Boucle for, sémantique classique *)
-    | SFor of expr option * expr option * expr option * instruction option
+    | SFor of expr option * expr * expr option * instruction option
     | SBlock of instruction list
     (** Expression optionnelles, pour les méthodes void *)
     | SReturn of expr option
@@ -256,7 +261,7 @@ module Sast = struct
     (** Liste des relations d'héritages *)
     sclass_extends : (ident * pos) option;
     (** Les attributs, sous forme de paires *)
-    sclass_attrs : ident array
+    sclass_attrs : ident Cmap.t
     (** les constructeurs (ils peuvent être surchargés), le champ returnType est toujours nul*)
     sclass_consts : callable array;
     (** le tableau des méthodes *)
