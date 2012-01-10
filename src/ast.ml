@@ -13,6 +13,17 @@ module General = struct
     fChar: int;
     lChar : int;
   }
+
+  (** Opérateurs binaires (toujours infixes) sur les expressions *)
+  type binaire =
+    | Eq | Neq | Leq | Geq | Lt | Gt 
+    | Plus | Minus | Star | Div 
+    | Mod 
+    | And | Or
+    
+  (** Opérateurs unaires prefixes et postfixes sur les expressions *)
+  type prefpost = Incr | Decr
+
 end
 
 module Cmap = Map.Make(String)
@@ -36,24 +47,11 @@ type types =
   | Bool
   | Int
   | C of string 
-
-(** Opérateurs binaires (toujours infixes) sur les expressions *)
-type binaire =
-  | Eq | Neq | Leq | Geq | Lt | Gt 
-  | Plus | Minus | Star | Div 
-  | Mod 
-  | And | Or
     
-(** Opérateurs unaires sur les expressions *)
-type unaire =
-  | Incr | Decr
-  | Not
-  | UMinus
-    
-(** Appels à des variables, méthodes, et attributs *)
+(** Valeurs gauches *)
 type vars =
   | Var of ident
-  | Attr of expr * ident 
+  | Attr of expr * ident
 
 (** Représente la grammaire des expressions, le premier paramètre de chaque constructeur est la position *)
 and expr = 
@@ -61,21 +59,28 @@ and expr =
   | Sconst of pos * string
   | Bconst of pos * bool
   | Null of pos
-  | Unaire of pos * unaire * expr
+  | Not of pos * expr
+  | UMinus of pos * expr
+  | Pref of pos * prefpost * vars
+  | Post of pos * prefpost * vars
   | Binaire of pos * binaire * expr * expr
   (** caste l'expression *)
   | Cast of pos * types * expr
   (** assigne expr *)
   | Assign of pos * vars * expr
-  (** Appel d'une méthode, les paramètres sont stockés dans la liste *)
-  | Call of pos * vars * expr list
+  (** Appel d'une méthode, les paramètres sont stockés dans la liste 
+  expr option : la classe, si None, alors classe courante 
+  ident : le nom de la méthode *)
+  | Call of pos * expr option * string * expr list
   (** Accès a une variable (au sens large) *)
   | Getval of pos * vars  
   (** expression booléene, vrai si expr est une instance de types *)
   | Instanceof of pos * expr * types
   (** opérateur d'instanciation de la classe ident
       les paramètres du constructeur sont pasés sous forme de liste *)
-  | New of pos * ident * expr list 
+  | New of pos * ident * expr list
+(** System.Print.Out(e) *)
+  | Print of pos * expr 
 
 (** Repérsente la grammaire des instructions *)
 type instruction  = 
@@ -171,24 +176,20 @@ module Sast = struct
 
   (** Les idents contiennent les infos de typage *)
   type ident = { id_id : string; id_typ : stypes }
-
-  (** Opérateurs binaires (toujours infixes) sur les expressions *)
-  type binaire =
-    | SEq | SNeq | SLeq | SGeq | SLt | SGt 
-    | SPlus | SMinus | SStar | SDiv 
-    | SMod 
-    | SAnd | SOr
         
-  (** Opérateurs unaires sur les expressions *)
-  type unaire =
-    | SIncr | SDecr
-    | SNot
-    | SUMinus
-        
-  (** Appels à des variables, méthodes, et attributs *)
+  (** Valeurs gauches *)
   type vars =
     | SVar of ident
     | SAttr of expr * ident 
+
+  (** les méthodes et constructeurs *)
+  type callable = {
+    scall_pos : pos;
+    scall_returnType : stypes;
+    scall_name : string;
+    scall_params : ident list;
+    scall_body : instruction list;
+  }
 
   (** Représente la grammaire des expressions, le premier paramètre de chaque constructeur est la position *)
   and expr_v = 
@@ -196,21 +197,26 @@ module Sast = struct
     | SSconst of string 
     | SBconst of bool 
     | SNull
-    | SUnaire of unaire * expr 
+    | SNot of expr
+    | SUMinus of expr
+    | SPref of prefpost * vars
+    | SPost of prefpost * vars
     | SBinaire of binaire * expr * expr 
     (** caste l'expression *)
     | SCast of stypes * expr 
     (** assigne expr *)
     | SAssign of vars * expr 
     (** Appel d'une méthode, les paramètres sont stockés dans la liste *)
-    | SCall of vars * expr list 
+    | SCall of string * int * expr list 
     (** Accès a une variable (au sens large) *)
     | SGetval of vars 
     (** expression booléene, vrai si expr est une instance de types *)
     | SInstanceof of expr * stypes 
     (** opérateur d'instanciation de la classe ident
         les paramètres du constructeur sont pasés sous forme de liste *)
-    | SNew of ident * expr list  
+    | SNew of ident * expr list
+    (** System.print.out(e) *)
+    | SPrint of expr 
 
   and expr = { sv : expr_v; st : stypes ; sp : pos }
 
@@ -228,36 +234,27 @@ module Sast = struct
     (** Expression optionnelles, pour les méthodes void *)
     | SReturn of expr option
 
-  (** Les variables associèes à leur type *)
-  type variable = stypes * ident
-  (** les méthodes et constructeurs *)
-  type callable = {
-    scall_pos : pos;
-    scall_returnType : stypes;
-    scall_name : ident;
-    scall_params : variable list;
-    scall_body : instruction list;
-  }
+
       
   (** représentation d'une classe *)
   type classe = {
     sclass_pos : pos ;
     (** Le nom de la classe*)
-    sclass_name : ident ;
+    sclass_name : string ;
     (** Liste des relations d'héritages *)
     sclass_extends : (ident * pos) option;
     (** Les attributs, sous forme de paires *)
-    sclass_attrs : (variable * pos) list;
+    sclass_attrs : ident Cmap.t
     (** les constructeurs (ils peuvent être surchargés), le champ returnType est toujours nul*)
-    sclass_consts : callable list;
+    sclass_consts : callable array;
     (** la liste des méthodes, pouvant avoir des noms identiques *)
-    sclass_methods : callable list;
+    sclass_methods : (callable array) Cmap.t;
   }
 
   (** representation d'un programme petit java *)
   type prog = {
     (** liste des classes *)
-    sclasses : classe list ;
+    sclasses : classe Cmap.t ;
     (** liste des instructions dans main*)
     sinstr : instruction list ;
   }
