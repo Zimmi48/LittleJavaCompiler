@@ -97,7 +97,7 @@ type instruction  =
   | Return of expr option
 
 (** Les variables associèes à leur type *)
-type variable = {v_type : types ; v_name : ident }
+type variable = {v_type : types ; v_name : ident; v_pos : pos }
 
 (** les méthodes et constructeurs *)
 type callable = {
@@ -116,7 +116,7 @@ type classe = {
   (** Liste des relations d'héritages *)
   class_extends : (ident * pos) option;
   (** Les attributs, sous forme de paires *)
-  class_attrs : (variable * pos) list;
+  class_attrs : variable list;
   (** les constructeurs (ils peuvent être surchargés), le champ returnType est toujours nul*)
   class_consts : callable list;
   (** la liste des méthodes, pouvant avoir des noms identiques *)
