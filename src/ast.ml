@@ -137,6 +137,17 @@ end
 (** syntaxe issue de l'analyse et du typage des classes *) 
 module Oast = struct 
   include Past 
+
+  (** les méthodes et constructeurs *)
+  type callable = {
+    ocall_pos : pos;
+    (* identifiant unique, plus tard n° dans l'entrée du tableau *)
+    ocall_id : int ; 
+    ocall_returnType : types;
+    ocall_name : ident;
+    ocall_params : variable list;
+    ocall_body : instruction list;
+  }
     
   (** représentation d'une classe *)
   type classe = {
@@ -146,7 +157,7 @@ module Oast = struct
     (** relations d'héritages *)
     oclass_extends : (ident * pos) option;
     (** Les attributs, sous forme d'une Map qui à chacun associe une variable *)
-    oclass_attrs : variable Cmap.t;
+    oclass_attrs : (variable * int) Cmap.t;
     (** les constructeurs (ils peuvent être surchargés), le champ returnType est toujours nul*)
     oclass_consts : callable list;
     (** la Map des méthodes, pouvant avoir des noms identiques *)
@@ -248,8 +259,8 @@ module Sast = struct
     sclass_attrs : ident array
     (** les constructeurs (ils peuvent être surchargés), le champ returnType est toujours nul*)
     sclass_consts : callable array;
-    (** la liste des méthodes, pouvant avoir des noms identiques *)
-    sclass_methods : (callable array) Cmap.t;
+    (** le tableau des méthodes *)
+    sclass_methods : callable array;
   }
 
   (** representation d'un programme petit java *)
