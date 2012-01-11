@@ -10,19 +10,18 @@
       fChar = startpos.pos_cnum ;
       lChar = endpos.pos_cnum }
 
-  type decl = | Attribut of variable * pos
+  type decl = | Attribut of variable
               | Const of callable
               | Method of callable
       
   (* utile à l'intérieur du parser *)
   type classouinstr = Class of classe | Instr of instruction list
 
-
   let rec attrsAndConstsAndMethods_of_decls = function
     | [] -> [] , [] , []
-    | Attribut (a , pos) :: t ->
+    | Attribut a :: t ->
         let la , lc , lm = attrsAndConstsAndMethods_of_decls t in
-        (a , pos)::la , lc , lm
+        a :: la , lc , lm
     | Const c :: t ->
         let la , lc , lm = attrsAndConstsAndMethods_of_decls t in
         la , c::lc , lm
@@ -76,7 +75,7 @@ l = classe* EOF {
     | Class c :: t -> let l , m = checkClasses t in c :: l , m
     | _ -> raise (ClassMain (position $startpos $endpos)) in
   let l , m = checkClasses l in
-  { classes = l ; instr = m } }
+  { classes = l ; instr = Block m } }
 ;
 
 classe:
@@ -105,58 +104,55 @@ extends:
 ;
 
 decl:
-| t = typ id = IDENT SEMICOLON { Attribut ( (t, id) , position $startpos $endpos ) }
+| var = variable SEMICOLON
+    { Attribut var }
 | c = constructeur { Const c }
 | m = methode { Method m }
 ;
 
 constructeur:
 | id = IDENT
-    LP p = separated_list(COMMA, parametre) RP LB i = instructions RB
+    LP p = separated_list(COMMA, variable) RP LB i = instructions RB
     {
       { call_pos = position $startpos $endpos ;
         call_returnType = Void ;
         call_name = id ;
         call_params = p ;
-        call_body = i }
+        call_body = Block i }
     }
 ;
 
 methode:
 | t = typ id = IDENT
-    LP p = separated_list(COMMA, parametre) RP LB i = instructions RB
+    LP p = separated_list(COMMA, variable) RP LB i = instructions RB
     {
       { call_pos = position $startpos $endpos ;
         call_returnType = t ;
         call_name = id ;
         call_params = p ;
-        call_body = i }
+        call_body = Block i }
     }
 | VOID id = IDENT
-    LP p = separated_list(COMMA, parametre) RP LB i = instructions RB
+    LP p = separated_list(COMMA, variable) RP LB i = instructions RB
     {
       { call_pos = position $startpos $endpos ;
         call_returnType = Void ;
         call_name = id ;
         call_params = p ;
-        call_body = i }
+        call_body = Block i }
     }
-;
 
-parametre:
-t = typ id = IDENT { t, id }
-;
-;
+variable:
+t = typ id = IDENT
+    { {v_type = t ; v_name = id ; v_pos = position $startpos $endpos } }
 
 typNatif:
 | BOOLEAN    { Bool }
 | INT        { Int }
-;
 
 typ:
 | t = typNatif { t }
 | id = IDENT { C id }
-;
 
 (* Définition recoupée en nombreux non terminaux des expressions *)
 expr:
