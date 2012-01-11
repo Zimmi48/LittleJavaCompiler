@@ -33,6 +33,10 @@ module Exceptions = struct
   (** const/attribu/méthode manquante pour la classe C (la pos, la classe, l'attribu)*)
   exception Missing of pos * string * string 
 
+  (**N'est pas une valeur gauche **)
+  exception NotALeftValue of pos
+      
+
 end
 
   
@@ -335,25 +339,34 @@ module  CheckInstr = struct
     | Getval(p,left) ->
       let  left = typLeft classes c env p left in
       { sv = SGetval(left.lv);  st = left.lt ; sp = p }
-    | Assign(p,left,e) ->
-      let left = typLeft classes c env p left in
+    | Assign(p,(Getval(p1,left)),e) ->
+      let left = typLeft classes c env p1 left in
       let exp = typExpr classes c env e in
       if not (isSubType classes exp.st left.lt) then
 	raise (WrongType(exp.sp, exp.st, Some(left.lt)))
       else
 	{ sp = p; st = left.lt; sv = SAssign(left.lv,exp)}
-    | Pref(p,op,left) ->
-      let left = typLeft classes c env p left in
+    | Assign(p,e,e2) ->
+      let e = typExpr classes c env e in
+      (raise (NotALeftValue e.sp))
+    | Pref(p,op,(Getval(p1,left))) ->
+      let left = typLeft classes c env p1 left in
       if left.lt != SInt then
 	(raise (WrongType (p,left.lt, Some (SInt))))
       else
 	{sv = SPref(op,left.lv); st = SInt; sp = p }
-    | Post(p,op,left) -> 
-      let left = typLeft classes c env p left in
+    | Pref(p,op,e) ->
+      let e = typExpr classes c env e in
+      (raise (NotALeftValue(e.sp)))
+    | Post(p,op,(Getval(p1,left))) -> 
+      let left = typLeft classes c env p1 left in
       if left.lt != SInt then
 	(raise (WrongType (p,left.lt, Some (SInt))))
       else
 	{sv = SPost(op,left.lv); st = SInt; sp = p}
+    | Post(p,op,e) ->
+      let e = typExpr classes c env e in
+      (raise (NotALeftValue(e.sp)))
     | UMinus (p,e) ->
       let e = typExpr classes c env e in
       if e.st != SInt then
@@ -499,7 +512,7 @@ module  CheckInstr = struct
 	
 
   (** Levée quand on tombe sur l'instruction return *)
-  exception Return of sexpr
+  exception EReturn of sexpr
       
   (** typage des instructions *)
   let rec typInstr classes c env = function
@@ -562,8 +575,8 @@ module  CheckInstr = struct
 	| None -> None 
 	| Some f -> Some (typExpr classes c env f)
       in
-      raise (SReturn(e)))
-	
+      (env,(SReturn(e)))
+(*	
   (** type un programme Oast vers un programme Sast *)
   let typProg prog = 
     let atomic c = 
@@ -574,6 +587,6 @@ module  CheckInstr = struct
       (* typage d'un callable *)
       let tCall call =
 	let env =
-    
+*)
 end	
 		    

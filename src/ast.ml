@@ -67,7 +67,7 @@ module Past = struct
     (** caste l'expression *)
     | Cast of pos * types * expr
     (** assigne expr *)
-    | Assign of pos * vars * expr
+    | Assign of pos * expr * expr
     (** Appel d'une méthode, les paramètres sont stockés dans la liste 
         expr option : la classe, si None, alors classe courante 
         ident : le nom de la méthode *)
