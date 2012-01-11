@@ -141,12 +141,16 @@ module Oast = struct
   (** les méthodes et constructeurs *)
   type ocallable = {
     ocall_pos : pos;
-    (* identifiant unique, plus tard n° dans l'entrée du tableau *)
-    ocall_id : int ; 
     ocall_returnType : types;
     ocall_name : ident;
     ocall_params : variable list;
     ocall_body : instruction;
+  }
+
+  type oSimple = {
+    osimple_id : int ;
+    osimple_params : variable list;
+    osimple_name : string;
   }
       
   (** représentation d'une classe *)
@@ -158,12 +162,12 @@ module Oast = struct
     oclass_extends : (ident*pos) option;
     (** Les attributs, sous forme d'une Map qui à chacun associe une variable *)
     oclass_attrs : variable Cmap.t;
-    (** les constructeurs (ils peuvent être surchargés), le champ returnType est toujours nul*)
+    (** descripteur de classe *)
+    oclass_methodesdesc : oSimple list;
+    (** liste des constructeurs *)
     oclass_consts : ocallable list;
-    (** Nombre de constructeurs *)
-    oclass_cn : int;
     (** la Map des méthodes, pouvant avoir des noms identiques *)
-    oclass_methods : (ocallable list) Cmap.t;
+    oclass_methods : (int list) Cmap.t;
     (** nombre de méthodes *)
     oclass_cm : int ;
     
@@ -172,6 +176,8 @@ module Oast = struct
   type oprog = {
     (** Map des classes *)
     oclasses : oclasse Cmap.t ;
+    (** Map de toutes les méthodes *)
+    ocall : ocallable Imap.t ;
     (** liste des instructions dans main*)
     oinstr : instruction;
   }
@@ -260,18 +266,20 @@ module Sast = struct
     sclass_name : string ;
     (** Liste des relations d'héritages *)
     sclass_extends : sident option;
-    (** Les attributs, sous forme de paires *)
+    (** Les attributs *)
     sclass_attrs : sident Cmap.t;
     (** les constructeurs (ils peuvent être surchargés), le champ returnType est toujours nul*)
     sclass_consts : scallable array;
     (** le tableau des méthodes *)
-    sclass_methods : scallable array;
+    sclass_methods : int array;
   }
 
   (** representation d'un programme petit java *)
   type sprog = {
     (** liste des classes *)
     sclasses : sclasse Cmap.t ;
+    (** map de toutes les méthodes *)
+    scall : scallable array;
     (** liste des instructions dans main*)
     sinstr : sinstruction ;
   }
