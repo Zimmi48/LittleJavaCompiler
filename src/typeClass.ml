@@ -201,7 +201,7 @@ module ClassAnalysis = struct
 
   (** construit un arbre Oast à partir d'un arbre Past en effectuant les tests 
       quivontbien *)
-  let typClasses prog = 
+  let typProg prog = 
     (* vérification d'unicité des noms des classes *)
     let classes = buildClassMap prog in
     (* on traduit les classes en oclasses *)
@@ -497,7 +497,10 @@ module  CheckInstr = struct
 	  | _ -> (raise (WrongType(e.sp,e.st,None)))
       end
 	
-	
+
+  (** Levée quand on tombe sur l'instruction return *)
+  exception Return of sexpr
+      
   (** typage des instructions *)
   let rec typInstr classes c env = function
     | Expr(e) ->
@@ -559,7 +562,18 @@ module  CheckInstr = struct
 	| None -> None 
 	| Some f -> Some (typExpr classes c env f)
       in
-      (env,(SReturn(e)))
+      raise (SReturn(e)))
 	
+  (** type un programme Oast vers un programme Sast *)
+  let typProg prog = 
+    let atomic c = 
+      let env,attrMap = Cmap.fold 
+	(fun n v (e,a) ->
+	  (Cmap.add n (types_to_Sast v.v_type) e),(Cmap.add n { id_id = n; id_typ = types_to_Sast v.v_type})) c.oclass_attrs (Cmap.empty,Cmap.empty) in
+      let env = Cmap.add "this" (SC c.oclass_name) env in
+      (* typage d'un callable *)
+      let tCall call =
+	let env =
+    
 end	
 		    

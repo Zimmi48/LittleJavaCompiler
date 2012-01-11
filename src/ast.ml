@@ -61,8 +61,8 @@ and expr =
   | Null of pos
   | Not of pos * expr
   | UMinus of pos * expr
-  | Pref of pos * prefpost * vars
-  | Post of pos * prefpost * vars
+  | Pref of pos * prefpost * expr
+  | Post of pos * prefpost * expr
   | Binaire of pos * binaire * expr * expr
   (** caste l'expression *)
   | Cast of pos * types * expr
