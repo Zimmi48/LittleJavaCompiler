@@ -91,7 +91,9 @@ let print_instruction fmt = function
   | Jal s ->
       fprintf fmt "\tjal  %s\n" s
   | Jr r ->
-      fprintf fmt "\tjr   %a\n" print_register r
+    fprintf fmt "\tjr   %a\n" print_register r
+  | Beqz (r,s) ->
+    fprintf fmt "\tbeqz   %a, %s\n" print_register r s
   | Syscall ->
       fprintf fmt "\tsyscall\n"
   | Label s ->

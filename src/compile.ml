@@ -28,18 +28,13 @@ let compile_program p ofile =
     | SVar { id_id = id } ->
       begin
       try let pos_relative = Smap.find id env in
-          (* si la variable est locale à la méthode *)
+          (* la variable doit être locale à la méthode car on aura rajouté this devant sinon au typage *)
           Arith (Add, A0, FP, Oimm pos_relative) :: acc
-      with Not_found -> (*
-        try
-          let
-          compile_expr (SGetval "this") env (
-            
-            acc ) 
-        with 
-          | Not_found -> *)failwith "Variable inconnue. Analyse de portée mal faite !"
+      with Not_found -> failwith "Variable inconnue. Analyse de portée mal faite !"
       end
-    | SAttr (var, id) -> failwith "Not implemented"
+    | SAttr (e, id) ->
+(*      compile e env ( *)
+        
 
   (* calcule en utilisant la pile et les registres A0 et A1,
      stocke le résultat dans A0 *)
