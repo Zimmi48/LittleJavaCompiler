@@ -71,7 +71,7 @@ module Past = struct
     (** Appel d'une méthode, les paramètres sont stockés dans la liste 
         expr option : la classe, si None, alors classe courante 
         ident : le nom de la méthode *)
-    | Call of pos * expr option * string * expr list
+    | Call of pos * expr option * ident * expr list
     (** Accès a une variable (au sens large) *)
     | Getval of pos * vars  
     (** expression booléene, vrai si expr est une instance de types *)
