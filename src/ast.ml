@@ -148,9 +148,11 @@ module Oast = struct
     ocall_params : variable list;
     ocall_body : instruction;
   }
-
+      
+  (** Les méthodes/constructeurs dans le descripteur *)
   type oSimple = {
     osimple_id : int ;
+    osimple_cid : int ;
     osimple_params : variable list;
     osimple_name : string;
   }
@@ -166,6 +168,8 @@ module Oast = struct
     oclass_attrs : variable Cmap.t;
     (** descripteur de classe *)
     oclass_methodesdesc : oSimple list;
+    (** descripteur des constructeur *)
+    oclass_constsdesc : oSimple list;
     (** liste des constructeurs *)
     oclass_consts : ocallable list;
     (** la Map des méthodes, pouvant avoir des noms identiques *)
@@ -178,7 +182,7 @@ module Oast = struct
   type oprog = {
     (** Map des classes *)
     oclasses : oclasse Cmap.t ;
-    (** Map de toutes les méthodes *)
+    (** Map de toutes les méthodes et des constructeurs *)
     ocall : ocallable Imap.t ;
     (** liste des instructions dans main*)
     oinstr : instruction;
@@ -271,7 +275,7 @@ module Sast = struct
     (** Les attributs *)
     sclass_attrs : sident Cmap.t;
     (** les constructeurs (ils peuvent être surchargés), le champ returnType est toujours nul*)
-    sclass_consts : scallable array;
+    sclass_consts : int array;
     (** le tableau des méthodes *)
     sclass_methods : int array;
   }
@@ -280,7 +284,7 @@ module Sast = struct
   type sprog = {
     (** liste des classes *)
     sclasses : sclasse Cmap.t ;
-    (** map de toutes les méthodes *)
+    (** map de toutes les méthodes et des constructeurs *)
     scall : scallable array;
     (** liste des instructions dans main*)
     sinstr : sinstruction ;
