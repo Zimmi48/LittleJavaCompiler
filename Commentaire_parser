@@ -7,3 +7,6 @@ Cela reste à confirmer, mais en effet, il semblerait que ce dernier
 n'accepte pas les expressions du genre ++ ++ a. Pourtant elles sont
 clairement permises si on se réfère au dernier chapitre (grammaire du
 langage) du livre officiel sur les spécifications de Java.
+--
+C'est vrai ça ? parce que on dirait que javac de java 7 n'accepte que des valeurs gauches.
+Voir le test.java à la racine.
