@@ -173,8 +173,8 @@ module Sast = struct
 
   (** Accès à des méthodes *)
   and methode_acces =
-    | Fun of ident (* accès à une méthode de la classe courante *)
-    | Meth of expr * ident
+    | SFun of ident (* accès à une méthode de la classe courante *)
+    | SMeth of expr * ident
 
   (** Représente la grammaire des expressions, le premier paramètre de chaque constructeur est la position *)
   and expr_v = 
