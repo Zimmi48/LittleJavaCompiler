@@ -26,6 +26,8 @@ module General = struct
 
 end
 
+module Int = struct type t = int let compare = compare end
+module Imap = Map.Make(Int)
 module Cmap = Map.Make(String)
 
 (** Syntaxe issue du parsage *)
