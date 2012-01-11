@@ -15,6 +15,7 @@ module Smap = Map.Make(String)
 
 let compile_program p ofile =
   let string_nb = ref 0 in
+  let condition_nb = ref 0 in
   let soi = string_of_int in
   let int_of_bool = function true -> 1 | false -> 0 in
   let data = ref [Word ("null", 0)] (* l'adresse de NULL *)
@@ -76,12 +77,12 @@ let compile_program p ofile =
          seulement fonctionne avec les ints et bool *)
       (* à modifier : java spécifie que les expressions sont compilées dans
          l'autre sens *)
-      compile_expr e2 env ( (* compile e2 et stocke sur la pile *)
+      compile_expr e1 env ( (* compile e1 et stocke sur la pile *)
         Sw (A0, Areg (0, SP)) ::
           Arith (Sub, SP, SP, Oimm 4) ::
-          compile_expr e1 env ( (* compile e1 et laisse dans A0 *)
+          compile_expr e2 env ( (* compile e2 et laisse dans A0 *)
             Arith (Add, SP, SP, Oimm 4) ::
-              Lw (A1, Areg (0, SP)) :: (* cherche la valeur de e2 *)
+              Lw (A1, Areg (0, SP)) :: (* cherche la valeur de e1 *)
               begin
               if e1.st = SInt & e2.st = SInt then
                 Arith (
@@ -96,7 +97,7 @@ let compile_program p ofile =
                       | SDiv -> Div | SMod -> Mod
                       | _ -> failwith "Typage mal fait"
                   end
-                    , A0, A0, Oreg A1 )
+                    , A0, A1, Oreg A0 )
                 :: acc
               else if e1.st = SBool & e2.st = SBool then
                 Arith (Neq, A0, A0, Oimm 0) ::
@@ -111,13 +112,13 @@ let compile_program p ofile =
                       | SAnd -> Mul
                       | _ -> failwith "Typage mal fait"
                   end
-                    , A0, A0, Oreg A1 )
+                    , A0, A1, Oreg A0 )
                 :: acc
               else failwith "Not implemented"
               (* rajouter les comparaisons généralisées et la concaténation 
                  de chaînes *)
               end ) )
-    | SCall (m, args) ->
+(*    | SCall (m, args) ->
       begin
       match m with
           SAttr (
@@ -132,11 +133,32 @@ let compile_program p ofile =
               | _ -> failwith "Typage mal fait"
             end
         | _ -> failwith "Not implemented"
-      end
+      end *)
+    | SGetval var ->
+      (* la variable considérée est toujours un mot (4 octets) *)
+      compile_vars var env (
+        Lw (A0, Areg (0, A0)) :: acc )
     | _ -> failwith "Not implemented"
   in
   let rec compile_instr instr env acc = match instr with
     | SExpr e -> compile_expr e env acc
+    | SIf (e, i, Some i') ->
+      let label_else = "else" ^ (ios condition_nb) in
+      let label_fin = "endif" ^ (ios condition_nb) in
+      incr condition_nb ;
+      compile_expr e env (
+        Beqz (A0, label_else) ::
+          compile_instr i env (
+            Label label_else ::
+              compile_instr i' env (
+                Label label_fin :: acc ) ) )
+    | SIf (e, i, None) ->
+      let label_fin = "endif" ^ (ios condition_nb) in
+      incr condition_nb ;
+      compile_expr e env (
+        Beqz (A0, label_fin) ::
+          compile_instr i env (
+            Label label_fin :: acc ) )
     | _ -> failwith "Not implemented"
   in
   let instrs =
