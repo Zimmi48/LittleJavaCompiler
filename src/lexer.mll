@@ -24,7 +24,8 @@
     "true", TRUE;
     "void", VOID;
     "Main", CLASS_MAIN; (* faux keywords *)
-    "main", MAIN]
+    "main", MAIN;
+    "System.out.print", PRINT]
   let id_or_kwd s = try List.assoc s kwd_tbl with _ -> IDENT s
 
   let newline lexbuf =
@@ -42,10 +43,7 @@ let space = [' ' '\t']
 
 rule token = parse
   | '\n'    { newline lexbuf; token lexbuf }
-  | space+  { token lexbuf }(* CODE MORT 
-  | "class" space+ "Main" space+ '{' space+ "public" space+ "static" space+
-      "void" space+ "main" space* '(' space* "String" space+ ident space* '['
-      space* ']' space* ')' { CLASSMAIN }*)
+  | space+  { token lexbuf }
   | ident as id { id_or_kwd id }
   | "++"    { PLUSPLUS }
   | "--"    { MINUSMINUS }

@@ -32,6 +32,7 @@
 %token <string> IDENT
 %token BOOLEAN, CLASS, ELSE, EXTENDS, FALSE, FOR, IF, INSTANCEOF, INT, NEW, NULL, PUBLIC, RETURN, STATIC, THIS, TRUE, VOID
 %token CLASS_MAIN MAIN LBRACKET RBRACKET
+%token PRINT
 %token EOF 
 %token EQ
 %token LP RP (* parenthèses *)
@@ -155,39 +156,36 @@ typ:
 
 (* Définition recoupée en nombreux non terminaux des expressions *)
 expr:
-| a = acces EQ e = expr { Assign (position $startpos $endpos , a , e) }
-| a = acces_methode LP l = separated_list(COMMA, expr) RP
-    { Call (position $startpos $endpos , a , l) }
-| NEW id = IDENT LP l = separated_list(COMMA, expr) RP
-    { New (position $startpos $endpos , id , l) }
+| i = INT_CST    { Iconst (position $startpos $endpos , i) }
+| s = STRING_CST { Sconst (position $startpos $endpos , s) }
+| TRUE           { Bconst (position $startpos $endpos , true) }
+| FALSE          { Bconst (position $startpos $endpos , false) }
+| NULL           { Null (position $startpos $endpos) }
+| NOT e = expr   { Not (position $startpos $endpos, e) }
+| MINUS e = expr %prec uminus { UMinus (position $startpos $endpos, e) }
+| op = opPrefPost e = expr    { Pref (position $startpos $endpos , op , e) }
+| e = expr op = opPrefPost    { Post (position $startpos $endpos , op , e) }
 | e1 = expr op = opInfix e2 = expr
     { Binaire (position $startpos $endpos , op , e1 , e2) }
-| e = expr INSTANCEOF t = typ
-    { Instanceof (position $startpos $endpos , e , t) }
-| op = opPrefPost a = expr
-    { Pref (position $startpos $endpos , op , a) }
-| a = expr op = opPrefPost
-    { Post (position $startpos $endpos , op , a) }
-| NOT e = expr
-    { Not (position $startpos $endpos, e) }
-| MINUS e = expr %prec uminus
-    { UMinus (position $startpos $endpos, e) }
 | LP t = typNatif RP f = expr %prec cast
     { Cast (position $startpos $endpos , t , f) }
 | LP e = expr RP f = expr %prec cast
     { match e with
       | Getval (_ , Var id) -> Cast (position $startpos $endpos , C id , f)
       | _ -> raise (PasUnType (position $startpos $endpos)) }
-| LP e = expr RP %prec atome { e }
-| i = INT_CST    { Iconst (position $startpos $endpos , i) }
-| s = STRING_CST { Sconst (position $startpos $endpos , s) }
-| TRUE           { Bconst (position $startpos $endpos , true) }
-| FALSE          { Bconst (position $startpos $endpos , false) }
+| a = acces EQ e = expr { Assign (position $startpos $endpos , a , e) }
+| a = acces_methode LP l = separated_list(COMMA, expr) RP
+       { Call (position $startpos $endpos , a , l) }
 | THIS { Getval (position $startpos $endpos , Var "this") }
 (* l'Ast ne gère pas ce type d'accès séparément. On le traite comme les autres à l'environnement de faire la différence *)
-| NULL           { Null (position $startpos $endpos) }
 | a = acces
     { Getval (position $startpos $endpos , a) }
+| e = expr INSTANCEOF t = typ
+    { Instanceof (position $startpos $endpos , e , t) }
+| NEW id = IDENT LP l = separated_list(COMMA, expr) RP
+    { New (position $startpos $endpos , id , l) }
+| PRINT LP e = expr RP { Print (position $startpos $endpos, e) }
+| LP e = expr RP %prec atome { e }
 
 %inline opInfix:
 | ISEQ { Eq }
@@ -259,4 +257,3 @@ instructionSansFinParIfSolo:
     { For (e1 , e2 , e3 , i) }
 | LB l = instructions RB { Block l }
 | RETURN e = expr? SEMICOLON { Return e }
-;

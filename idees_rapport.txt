@@ -1,0 +1,4 @@
+Avec la méthode adoptée pour System.out.print, cette écriture est
+obligatoire. On n'a pas le droit à ((((System)))).out.print. On a jugé que
+ce n'était pas grave, vu que de toute façon cette "méthode statique" est
+parachutée.
