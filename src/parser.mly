@@ -13,6 +13,10 @@
   type decl = | Attribut of variable * pos
               | Const of callable
               | Method of callable
+      
+  (* utile à l'intérieur du parser *)
+  type classouinstr = Class of classe | Instr of instruction list
+
 
   let rec attrsAndConstsAndMethods_of_decls = function
     | [] -> [] , [] , []
@@ -173,9 +177,11 @@ expr:
     { match e with
       | Getval (_ , Var id) -> Cast (position $startpos $endpos , C id , f)
       | _ -> raise (PasUnType (position $startpos $endpos)) }
-| a = acces EQ e = expr { Assign (position $startpos $endpos , a , e) }
-| a = acces_methode LP l = separated_list(COMMA, expr) RP
-       { Call (position $startpos $endpos , a , l) }
+| e1 = expr EQ e2 = expr { Assign (position $startpos $endpos , e1 , e2) }
+| e = expr DOT id = IDENT LP l = separated_list(COMMA, expr) RP
+       { Call (position $startpos $endpos , Some e , id , l) }
+| id = IDENT LP l = separated_list(COMMA, expr) RP
+       { Call (position $startpos $endpos , None , id , l) }
 | THIS { Getval (position $startpos $endpos , Var "this") }
 (* l'Ast ne gère pas ce type d'accès séparément. On le traite comme les autres à l'environnement de faire la différence *)
 | a = acces
@@ -209,10 +215,6 @@ expr:
 acces:
 | id = IDENT { Var id }
 | e = expr DOT id = IDENT { Attr (e , id) }
-
-acces_methode:
-| id = IDENT { Fun id }
-| e = expr DOT id = IDENT { Meth (e , id) }
 
 instructions:
 | i = instruction	           { [i] }

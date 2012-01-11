@@ -122,10 +122,6 @@ module Past = struct
     (** la liste des méthodes, pouvant avoir des noms identiques *)
     class_methods : callable list;
   }
-      
-  (* utile à l'intérieur du parser *)
-  type classouinstr = Class of classe | Instr of instruction list
-
 
   (** representation d'un programme petit java *)
   type prog = {
