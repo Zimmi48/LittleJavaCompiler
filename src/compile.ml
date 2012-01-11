@@ -1,4 +1,4 @@
-open Mips
+open Mips (* certains mots clefs communs sont écrasés par Ast.Sast *)
 open Ast.Sast
 open Format
 
@@ -52,13 +52,13 @@ let compile_program p ofile =
       La (A0 , adresse) :: acc
     | SBconst b -> Li (A0, int_of_bool b) :: acc
     | SNull -> La (A0, "null") :: acc
-    | SNot e -> compile_expr e env (Arith (Eq, A0, A0, Oimm 0) :: acc)
+    | SNot e -> compile_expr e env (Arith (Mips.Eq, A0, A0, Oimm 0) :: acc)
     | SUMinus e -> compile_expr e env (Neg (A0, A0) :: acc)
     | SPref (op, var) ->
       compile_vars var env (
         Move (T0, A0) ::
           Lw (A0, Areg (0, T0)) ::
-          Arith ( begin match op with SIncr -> Add | SDecr -> Sub end ,
+          Arith ( begin match op with Incr -> Add | Decr -> Sub end ,
             A0, A0, Oimm 1 ) ::
           Sw (A0, Areg (0, T0)) :: acc )
         (* la nouvelle valeur est replacée à l'adresse indiquée par T0
@@ -67,7 +67,7 @@ let compile_program p ofile =
       compile_vars var env (
         Move (T0, A0) ::
           Lw (A0, Areg (0, T0)) ::
-          Arith ( begin match op with SIncr -> Add | SDecr -> Sub end ,
+          Arith ( begin match op with Incr -> Add | Decr -> Sub end ,
             T1, A0, Oimm 1 ) ::
           Sw (T1, Areg (0, T0)) :: acc )
         (* la nouvelle valeur est replacée à l'adresse indiquée par T0 et
@@ -88,28 +88,28 @@ let compile_program p ofile =
                 Arith (
                   begin
                     match op with
-                      | SEq -> Eq | SNeq -> Neq
-                      | SLeq -> Leq | SGeq -> Geq
-                      | SLt -> Lt | SGt -> Gt
-                      | SPlus -> Add
-                      | SMinus -> Sub
-                      | SStar -> Mul
-                      | SDiv -> Div | SMod -> Mod
+                      | Eq -> Mips.Eq | Neq -> Mips.Neq
+                      | Leq -> Mips.Leq | Geq -> Mips.Geq
+                      | Lt -> Mips.Lt | Gt -> Mips.Gt
+                      | Plus -> Add
+                      | Minus -> Sub
+                      | Star -> Mul
+                      | Div -> Mips.Div | Mod -> Mips.Mod
                       | _ -> failwith "Typage mal fait"
                   end
                     , A0, A1, Oreg A0 )
                 :: acc
               else if e1.st = SBool & e2.st = SBool then
-                Arith (Neq, A0, A0, Oimm 0) ::
+                Arith (Mips.Neq, A0, A0, Oimm 0) ::
               (* on renormalise : A0 != 0 devient 1 ; 0 reste 0
                  afin que la comparaison Eq ou Neq ait lieu correctement *)
-                  Arith (Neq, A1, A1, Oimm 0) ::
+                  Arith (Mips.Neq, A1, A1, Oimm 0) ::
                   Arith (
                     begin
                       match op with
-                      | SEq -> Eq | SNeq -> Neq
-                      | SOr -> Add
-                      | SAnd -> Mul
+                      | Eq -> Mips.Eq | Neq -> Mips.Neq
+                      | Or -> Add
+                      | And -> Mul
                       | _ -> failwith "Typage mal fait"
                   end
                     , A0, A1, Oreg A0 )
@@ -143,8 +143,8 @@ let compile_program p ofile =
   let rec compile_instr instr env acc = match instr with
     | SExpr e -> compile_expr e env acc
     | SIf (e, i, Some i') ->
-      let label_else = "else" ^ (ios condition_nb) in
-      let label_fin = "endif" ^ (ios condition_nb) in
+      let label_else = "else" ^ (soi !condition_nb) in
+      let label_fin = "endif" ^ (soi !condition_nb) in
       incr condition_nb ;
       compile_expr e env (
         Beqz (A0, label_else) ::
@@ -153,7 +153,7 @@ let compile_program p ofile =
               compile_instr i' env (
                 Label label_fin :: acc ) ) )
     | SIf (e, i, None) ->
-      let label_fin = "endif" ^ (ios condition_nb) in
+      let label_fin = "endif" ^ (soi !condition_nb) in
       incr condition_nb ;
       compile_expr e env (
         Beqz (A0, label_fin) ::
@@ -162,14 +162,13 @@ let compile_program p ofile =
     | _ -> failwith "Not implemented"
   in
   let instrs =
-    [Label "main";
-     Move (S0, RA);
+    Label "main" ::
+      Move (S0, RA) ::
 (*     Arith (Mips.Sub, SP, SP, Oimm !frame_size); (* Alloue la frame *)
-     Arith (Mips.Add, FP, SP, Oimm (!frame_size - 4)) (* Initialise $fp *)*)
-    ] @
-      List.fold_right (function i -> compile_instr i Smap.empty) p.sinstr [
-    (* fin de main *)
-(*        Arith (Mips.Add, SP, SP, Oimm !frame_size); (* Désalloue la frame *)*)
+       Arith (Mips.Add, FP, SP, Oimm (!frame_size - 4)) (* Initialise $fp *)*)
+      compile_instr p.sinstr Smap.empty [
+        (* fin de main *)
+        (*        Arith (Mips.Add, SP, SP, Oimm !frame_size); (* Désalloue la frame *)*)
         Move (RA, S0);
         Jr RA;
         Label "print"; (* implémentation de print *)

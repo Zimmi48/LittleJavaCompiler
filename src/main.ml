@@ -121,7 +121,7 @@ let () =
       exit 1
     | TypeClass.Exceptions.AlreadyDefined (pos1, id, pos2) ->
       localisationBis pos1 ;
-      localisationBis pos2 ;
+      begin match pos2 with | None -> () | Some p -> localisationBis p end ;
       eprintf "Erreur : cette classe est définie plusieurs fois@.";
     | TypeClass.Exceptions.Undefined (pos, id) ->
       localisationBis pos ;

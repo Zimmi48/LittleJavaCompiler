@@ -1,4 +1,4 @@
-CMO=ast.cmo lexer.cmo parser.cmo typeClass.cmo type.cmo mips.cmo compile.cmo main.cmo
+CMO=ast.cmo lexer.cmo parser.cmo typeClass.cmo mips.cmo compile.cmo main.cmo
 GENERATED=lexer.ml parser.ml parser.mli
 BIN=pjava
 FLAGS=
