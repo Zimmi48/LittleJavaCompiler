@@ -166,13 +166,18 @@ module Sast = struct
   (** Opérateurs unaires prefixes et postfixes sur les expressions *)
   type prefpost = SIncr | SDecr   
         
-  (** Appels à des variables, méthodes, et attributs *)
+  (** Accès à des variables et attributs *)
   type vars =
     | SVar of ident
-    | SAttr of vars * ident 
+    | SAttr of expr * ident 
+
+  (** Accès à des méthodes *)
+  and methode_acces =
+    | Fun of ident (* accès à une méthode de la classe courante *)
+    | Meth of expr * ident
 
   (** Représente la grammaire des expressions, le premier paramètre de chaque constructeur est la position *)
-  type expr_v = 
+  and expr_v = 
     | SIconst of int 
     | SSconst of string 
     | SBconst of bool
@@ -187,7 +192,7 @@ module Sast = struct
     (** assigne expr *)
     | SAssign of vars * expr 
     (** Appel d'une méthode, les paramètres sont stockés dans la liste *)
-    | SCall of vars * expr list 
+    | SCall of methode_acces * expr list 
     (** Accès a une variable (au sens large) *)
     | SGetval of vars 
     (** expression booléene, vrai si expr est une instance de types *)
