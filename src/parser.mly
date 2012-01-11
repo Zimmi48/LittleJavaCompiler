@@ -53,6 +53,7 @@
 %left PLUS MINUS
 %left TIMES DIV MOD
 %right PLUSPLUS MINUSMINUS uminus NOT cast
+%left DOT
 %nonassoc atome
 
 /* Point d'entrée de la grammaire */
@@ -155,7 +156,7 @@ typ:
 (* Définition recoupée en nombreux non terminaux des expressions *)
 expr:
 | a = acces EQ e = expr { Assign (position $startpos $endpos , a , e) }
-| a = acces LP l = separated_list(COMMA, expr) RP
+| a = acces_methode LP l = separated_list(COMMA, expr) RP
     { Call (position $startpos $endpos , a , l) }
 | NEW id = IDENT LP l = separated_list(COMMA, expr) RP
     { New (position $startpos $endpos , id , l) }
@@ -209,11 +210,11 @@ expr:
 
 acces:
 | id = IDENT { Var id }
-| a = acces DOT id = IDENT
-    { Attr (Getval (position $startpos(a) $endpos(a) , a) , id) }
-| LP e = expr RP DOT id = IDENT
-    { Attr (e , id) }
-;
+| e = expr DOT id = IDENT { Attr (e , id) }
+
+acces_methode:
+| id = IDENT { Fun id }
+| e = expr DOT id = IDENT { Meth (e , id) }
 
 instructions:
 | i = instruction	           { [i] }

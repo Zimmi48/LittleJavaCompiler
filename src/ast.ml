@@ -46,10 +46,15 @@ module Past = struct
   (** Opérateurs unaires prefixes et postfixes sur les expressions *)
   type prefpost = Incr | Decr
         
-  (** Appels à des variables, méthodes, et attributs *)
+  (** Accès à des variables et attributs *)
   type vars =
     | Var of ident
     | Attr of expr * ident 
+
+  (** Accès à des méthodes *)
+  and methode_acces =
+    | Fun of ident (* accès à une méthode de la classe courante *)
+    | Meth of expr * ident
 
   (** Représente la grammaire des expressions, le premier paramètre de chaque constructeur est la position *)
   and expr = 
@@ -67,7 +72,7 @@ module Past = struct
     (** assigne expr *)
     | Assign of pos * vars * expr
     (** Appel d'une méthode, les paramètres sont stockés dans la liste *)
-    | Call of pos * vars * expr list
+    | Call of pos * methode_acces * expr list
     (** Accès a une variable (au sens large) *)
     | Getval of pos * vars  
     (** expression booléene, vrai si expr est une instance de types *)

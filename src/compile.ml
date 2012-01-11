@@ -2,6 +2,17 @@ open Mips
 open Ast.Sast
 open Format
 
+(* A faire : calcul de la taille du tableau d'activation pour chaque méthode
+   les variables définies à l'intérieur de blocs sont comptées *)
+(* lors de l'appel d'une méthode, seul this est accessible en plus des vars
+   locales *)
+(* si une var a n'est pas locale, tester this.a *)
+(* On utilise une table d'association dont les clés sont les variables
+   locales (des chaînes de caractères) et où la valeur associée est la
+   position par rapport à $fp (en octets) *)
+module Smap = Map.Make(String)
+  
+
 let compile_program p ofile =
   let string_nb = ref 0 in
   let soi = string_of_int in
@@ -11,14 +22,27 @@ let compile_program p ofile =
   (* calcule l'adresse de var en utilisant la pile, stocke le
            résultat dans A0 *)
   (* les instructions compilées sont placées devant l'accumulateur acc *)
-  let rec compile_vars var acc = match var with
-    | SVar { id_id = id } -> failwith "Not implemented"
+  (* env est la SMap décrite plus haut *)
+  let rec compile_vars var env acc = match var with
+    | SVar { id_id = id } ->
+      begin
+      try let pos_relative = Smap.find id env in
+          (* si la variable est locale à la méthode *)
+          Arith (Add, A0, FP, Oimm pos_relative) :: acc
+      with Not_found -> (*
+        try
+          let
+          compile_expr (SGetval "this") env (
+            
+            acc ) 
+        with 
+          | Not_found -> *)failwith "Variable inconnue. Analyse de portée mal faite !"
+      end
     | SAttr (var, id) -> failwith "Not implemented"
-  in
+
   (* calcule en utilisant la pile et les registres A0 et A1,
      stocke le résultat dans A0 *)
-  (* les instructions compilées sont placées devant l'accumulateur acc *)
-  let rec compile_expr expr acc = match expr.sv with
+  and compile_expr expr env acc = match expr.sv with
     | SIconst i -> Li (A0, i) :: acc
     | SSconst s ->
       let adresse = "string_" ^ soi !string_nb in
@@ -27,10 +51,10 @@ let compile_program p ofile =
       La (A0 , adresse) :: acc
     | SBconst b -> Li (A0, int_of_bool b) :: acc
     | SNull -> La (A0, "null") :: acc
-    | SNot e -> compile_expr e (Arith (Eq, A0, A0, Oimm 0) :: acc)
-    | SUMinus e -> compile_expr e (Neg (A0, A0) :: acc)
+    | SNot e -> compile_expr e env (Arith (Eq, A0, A0, Oimm 0) :: acc)
+    | SUMinus e -> compile_expr e env (Neg (A0, A0) :: acc)
     | SPref (op, var) ->
-      compile_vars var (
+      compile_vars var env (
         Move (T0, A0) ::
           Lw (A0, Areg (0, T0)) ::
           Arith ( begin match op with SIncr -> Add | SDecr -> Sub end ,
@@ -39,7 +63,7 @@ let compile_program p ofile =
         (* la nouvelle valeur est replacée à l'adresse indiquée par T0
            et reste dans A0 en tant que valeur de retour *)
     | SPost (op, var) ->
-      compile_vars var (
+      compile_vars var env (
         Move (T0, A0) ::
           Lw (A0, Areg (0, T0)) ::
           Arith ( begin match op with SIncr -> Add | SDecr -> Sub end ,
@@ -50,10 +74,12 @@ let compile_program p ofile =
     | SBinaire (op, e1, e2) ->
       (* surcharge des opérateurs non gérées :
          seulement fonctionne avec les ints et bool *)
-      compile_expr e2 ( (* compile e2 et stocke sur la pile *)
+      (* à modifier : java spécifie que les expressions sont compilées dans
+         l'autre sens *)
+      compile_expr e2 env ( (* compile e2 et stocke sur la pile *)
         Sw (A0, Areg (0, SP)) ::
           Arith (Sub, SP, SP, Oimm 4) ::
-          compile_expr e1 ( (* compile e1 et laisse dans A0 *)
+          compile_expr e1 env ( (* compile e1 et laisse dans A0 *)
             Arith (Add, SP, SP, Oimm 4) ::
               Lw (A1, Areg (0, SP)) :: (* cherche la valeur de e2 *)
               begin
@@ -100,7 +126,7 @@ let compile_program p ofile =
             begin
             match args with
               | [e] ->
-                  compile_expr e (
+                  compile_expr e env (
                     Jal "print" ::
                       acc )
               | _ -> failwith "Typage mal fait"
@@ -109,8 +135,8 @@ let compile_program p ofile =
       end
     | _ -> failwith "Not implemented"
   in
-  let rec compile_instr instr acc = match instr with
-    | SExpr e -> compile_expr e acc
+  let rec compile_instr instr env acc = match instr with
+    | SExpr e -> compile_expr e env acc
     | _ -> failwith "Not implemented"
   in
   let instrs =
@@ -119,7 +145,7 @@ let compile_program p ofile =
 (*     Arith (Mips.Sub, SP, SP, Oimm !frame_size); (* Alloue la frame *)
      Arith (Mips.Add, FP, SP, Oimm (!frame_size - 4)) (* Initialise $fp *)*)
     ] @
-      List.fold_right compile_instr p.sinstr [
+      List.fold_right (function i -> compile_instr i Smap.empty) p.sinstr [
     (* fin de main *)
 (*        Arith (Mips.Add, SP, SP, Oimm !frame_size); (* Désalloue la frame *)*)
         Move (RA, S0);
