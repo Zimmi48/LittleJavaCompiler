@@ -105,7 +105,7 @@ type callable = {
   call_returnType : types;
   call_name : ident;
   call_params : variable list;
-  call_body : instruction list;
+  call_body : instruction;
 }
     
 (** représentation d'une classe *)
@@ -132,7 +132,7 @@ type prog = {
   (** liste des classes *)
   classes : classe list ;
   (** liste des instructions dans main*)
-  instr : instruction list ;
+  instr : instruction;
 }
 
 end
@@ -150,7 +150,7 @@ module Oast = struct
     ocall_returnType : types;
     ocall_name : ident;
     ocall_params : variable list;
-    ocall_body : instruction list;
+    ocall_body : instruction;
   }
     
   (** représentation d'une classe *)
@@ -177,7 +177,7 @@ module Oast = struct
     (** Map des classes *)
     oclasses : oclasse Cmap.t ;
     (** liste des instructions dans main*)
-    oinstr : instruction list ;
+    oinstr : instruction;
 }
 end
 
@@ -209,7 +209,7 @@ module Sast = struct
     scall_returnType : stypes;
     scall_name : string;
     scall_params : sident list;
-    scall_body : sinstruction list;
+    scall_body : sinstruction;
   }
 
   (** Représente la grammaire des expressions, le premier paramètre de chaque constructeur est la position *)
@@ -277,7 +277,7 @@ module Sast = struct
     (** liste des classes *)
     sclasses : sclasse Cmap.t ;
     (** liste des instructions dans main*)
-    sinstr : sinstruction list ;
+    sinstr : sinstruction ;
   }
 
 end
