@@ -78,7 +78,7 @@ module Past = struct
     | Instanceof of pos * expr * types
     (** opérateur d'instanciation de la classe ident
         les paramètres du constructeur sont pasés sous forme de liste *)
-    | New of pos * ident * expr list
+    | New of pos * string * expr list
     (** System.Print.Out(e) *)
     | Print of pos * expr 
 
@@ -244,7 +244,7 @@ module Sast = struct
     | SInstanceof of sexpr * stypes 
     (** opérateur d'instanciation de la classe ident
         les paramètres du constructeur sont pasés sous forme de liste *)
-    | SNew of sident * int * sexpr list
+    | SNew of string * int option * sexpr list
     (** System.print.out(e) *)
     | SPrint of sexpr 
 

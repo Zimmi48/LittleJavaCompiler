@@ -3,15 +3,37 @@ open Ast
 open Sast
 open Format
 
-(* A faire :
-   Lors de la compilation d'une méthode.
-   calcul de la taille du tableau d'activation pour chaque méthode
-   idem pour le main *)
-
-module Smap = Map.Make(String)
-  
 
 let compile_program p ofile =
+
+  (* cette map permet de savoir quelles classes ont été traitées et retient
+     des maps associant les champs à des numéros *)
+  let classe_attrs = ref Cmap.empty in
+  (** détermine la place de chaque champ de chaque classe *)
+  let rec positionne_attrs name classe =
+    let attrs =
+    begin
+      match classe.sclass_extends with
+          Some pere ->
+            if not (Cmap.mem pere.id_id !classe_attrs) then
+              positionne_attrs pere.id_id (Cmap.find pere.id_id p.sclasses);
+            Cmap.find pere.id_id !classe_attrs
+        | _ -> Cmap.empty
+    end
+    in
+    let last_id_nb = ref (Cmap.cardinal attrs - 1) in
+    let attrs = Cmap.fold
+      (fun id_name _ attrs ->
+        incr last_id_nb ;
+        Cmap.add id_name !last_id_nb attrs)
+      classe.sclass_attrs
+      attrs
+    in
+    classe_attrs := Cmap.add name attrs !classe_attrs
+  in
+  let () = Cmap.iter positionne_attrs p.sclasses in
+    
+
   let string_nb = ref 0 in
   let condition_nb = ref 0 in
   let for_nb = ref 0 in
@@ -32,7 +54,7 @@ let compile_program p ofile =
   let rec compile_vars var env acc = match var with
     | SVar { id_id = id } ->
       begin
-      try let pos_relative = Smap.find id env in
+      try let pos_relative = Cmap.find id env in
           (* la variable doit être locale à la méthode car on aura rajouté
              this devant sinon au typage *)
           Arith (Add, A0, FP, Oimm pos_relative) :: acc
@@ -159,7 +181,8 @@ let compile_program p ofile =
       (* la variable considérée est toujours un mot (4 octets) *)
       compile_vars var env (
         Lw (A0, Areg (0, A0)) :: acc )
-(*    | SNew -> *)
+(*    | SNew (name, constr, args) ->*)
+      
     | SPrint e ->
       compile_expr e env (
         Jal "print" :: acc )
@@ -189,7 +212,7 @@ let compile_program p ofile =
             let t , frame_size =
               compile_instrs
                 t
-                (Smap.add id.id_id pos env) (* ajoute l'id à l'env *)
+                (Cmap.add id.id_id pos env) (* ajoute l'id à l'env *)
                 label_retour pos frame_size acc
             in
             begin
@@ -279,11 +302,11 @@ let compile_program p ofile =
       de l'appelant, et précède les variables locales *)
   let compile_meth meth i acc =
     let env , pos = List.fold_left (
-      fun (env,pos) id -> Smap.add id.id_id pos env, pos + 4 )
-      (Smap.empty, 8)
+      fun (env,pos) id -> Cmap.add id.id_id pos env, pos + 4 )
+      (Cmap.empty, 8)
       meth.scall_params
     in
-    let env = Smap.add "this" pos env in
+    let env = Cmap.add "this" pos env in
     let label_retour = "fin_meth_" ^ soi i in
     let label_debut = "debut_meth_" ^ soi i in
     let body , frame_size =
@@ -316,7 +339,7 @@ let compile_program p ofile =
     let body , frame_size =
       compile_instrs
         [p.sinstr]
-        Smap.empty
+        Cmap.empty
         label_retour
         (-4)
         (-4)
