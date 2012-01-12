@@ -2,41 +2,52 @@ open Mips (* certains mots clefs communs sont écrasés par Ast.Sast *)
 open Ast.Sast
 open Format
 
-(* A faire : calcul de la taille du tableau d'activation pour chaque méthode
-   les variables définies à l'intérieur de blocs sont comptées *)
-(* lors de l'appel d'une méthode, seul this est accessible en plus des vars
-   locales *)
-(* si une var a n'est pas locale, tester this.a *)
-(* On utilise une table d'association dont les clés sont les variables
-   locales (des chaînes de caractères) et où la valeur associée est la
-   position par rapport à $fp (en octets) *)
+(* A faire :
+   Lors de la compilation d'une méthode.
+   calcul de la taille du tableau d'activation pour chaque méthode
+   les variables définies à l'intérieur de blocs sont comptées
+   idem pour le main *)
+
 module Smap = Map.Make(String)
   
 
 let compile_program p ofile =
   let string_nb = ref 0 in
   let condition_nb = ref 0 in
+  let for_nb = ref 0 in
   let soi = string_of_int in
   let int_of_bool = function true -> 1 | false -> 0 in
   let data = ref [Word ("null", 0)] (* l'adresse de NULL *)
   in
-  (* calcule l'adresse de var en utilisant la pile, stocke le
-           résultat dans A0 *)
-  (* les instructions compilées sont placées devant l'accumulateur acc *)
-  (* env est la SMap décrite plus haut *)
+  (** convention : SP pointe toujours sur le prochain mot libre de la pile*)
+  (** compilation d'une méthode
+      création du tableau d'activation, sauvegarde de RA et de FP
+      on considère que la totalité des arguments doivent être passés
+      sur la pile, ce qui sera donc le début du tableau d'activation ;
+      les instructions compilées sont placées devant l'accumulateur acc *)
+ (* let compile_meth *)
+
+  (** calcule l'adresse de var en utilisant la pile, stocke le
+           résultat dans A0 ;
+      env est une table d'association dont les clés sont les variables
+      locales (des chaînes de caractères) et où la valeur associée est la
+      position par rapport à $fp (en octets) *)
   let rec compile_vars var env acc = match var with
     | SVar { id_id = id } ->
       begin
       try let pos_relative = Smap.find id env in
-          (* la variable doit être locale à la méthode car on aura rajouté this devant sinon au typage *)
+          (* la variable doit être locale à la méthode car on aura rajouté
+             this devant sinon au typage *)
           Arith (Add, A0, FP, Oimm pos_relative) :: acc
       with Not_found -> failwith "Variable inconnue. Analyse de portée mal faite !"
       end
-    | SAttr (e, id) ->
-(*      compile e env ( *)
+    | SAttr (e, id) -> failwith "Not implemented"
+(* D'abord compiler les classes
+      compile e env ( *)
+        
         
 
-  (* calcule en utilisant la pile et les registres A0 et A1,
+  (** calcule en utilisant la pile et les registres A0 et A1,
      stocke le résultat dans A0 *)
   and compile_expr expr env acc = match expr.sv with
     | SIconst i -> Li (A0, i) :: acc
@@ -68,10 +79,8 @@ let compile_program p ofile =
         (* la nouvelle valeur est replacée à l'adresse indiquée par T0 et
            l'ancienne valeur reste dans A0 en tant que valeur de retour *)
     | SBinaire (op, e1, e2) ->
-      (* surcharge des opérateurs non gérées :
+      (* surcharges de + et de = non gérées :
          seulement fonctionne avec les ints et bool *)
-      (* à modifier : java spécifie que les expressions sont compilées dans
-         l'autre sens *)
       compile_expr e1 env ( (* compile e1 et stocke sur la pile *)
         Sw (A0, Areg (0, SP)) ::
           Arith (Sub, SP, SP, Oimm 4) ::
@@ -113,26 +122,24 @@ let compile_program p ofile =
               (* rajouter les comparaisons généralisées et la concaténation 
                  de chaînes *)
               end ) )
-(*    | SCall (m, args) ->
-      begin
-      match m with
-          SAttr (
-            SAttr ( SVar { id_id = "System" } , { id_id = "out" } ) ,
-            { id_id = "print" } ) ->
-            begin
-            match args with
-              | [e] ->
-                  compile_expr e env (
-                    Jal "print" ::
-                      acc )
-              | _ -> failwith "Typage mal fait"
-            end
-        | _ -> failwith "Not implemented"
-      end *)
+    | SAssign (var, e) ->
+      (* compile la valeur gauche avant l'expression comme javac *)
+      compile_vars var env ( (* compile var et stocke sur la pile *)
+        Sw (A0, Areg (0, SP)) ::
+          Arith (Sub, SP, SP, Oimm 4) ::
+          compile_expr e env ( (* compile e et laisse dans A0 car ce sera
+                                  aussi la valeur de retour *)
+              Arith (Add, SP, SP, Oimm 4) ::
+              Lw (T0, Areg (0, SP)) :: (* cherche la valeur de var et place 
+                                          dans T0 *)
+              Sw (A0, Areg (0, T0)) :: acc ) ) (* assign proprement dit *)
     | SGetval var ->
       (* la variable considérée est toujours un mot (4 octets) *)
       compile_vars var env (
         Lw (A0, Areg (0, A0)) :: acc )
+    | SPrint e ->
+      compile_expr e env (
+        Jal "print" :: acc )
     | _ -> failwith "Not implemented"
   in
   let rec compile_instr instr env acc = match instr with
@@ -154,6 +161,29 @@ let compile_program p ofile =
         Beqz (A0, label_fin) ::
           compile_instr i env (
             Label label_fin :: acc ) )
+    | SFor (e1, e2, e3, i) ->
+      let label_debut = "for_debut" ^ (soi !for_nb) in
+      let label_fin = "for_fin" ^ (soi !for_nb) in
+      incr for_nb ;
+      begin (* initialisation *)
+        match e1 with
+          | Some e -> compile_expr e env
+          | None -> function acc -> acc
+      end (
+        Label label_debut ::
+          compile_expr e2 env (
+            Beqz (A0, label_fin) ::
+              begin (* instruction *)
+                match i with
+                  | Some i -> compile_instr i env
+                  | None -> function acc -> acc
+              end (
+                begin (* incrémentation *)
+                  match e3 with
+                    | Some e -> compile_expr e env
+                    | None -> function acc -> acc
+                end (
+                  Label label_fin :: acc ) ) ) )        
     | _ -> failwith "Not implemented"
   in
   let instrs =
