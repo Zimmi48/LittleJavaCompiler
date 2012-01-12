@@ -46,7 +46,7 @@ let compile_program p ofile =
 
 
   (** calcule l'adresse de var en utilisant la pile, stocke le
-           résultat dans A0 ;
+           résultat dans V0 ;
       env est une table d'association dont les clés sont les variables
       locales (des chaînes de caractères) et où la valeur associée est la
       position par rapport à $fp (en octets) ;
@@ -57,7 +57,7 @@ let compile_program p ofile =
       try let pos_relative = Cmap.find id env in
           (* la variable doit être locale à la méthode car on aura rajouté
              this devant sinon au typage *)
-          Arith (Add, A0, FP, Oimm pos_relative) :: acc
+          Arith (Add, V0, FP, Oimm pos_relative) :: acc
       with Not_found -> failwith "Variable inconnue. Analyse de portée mal faite !"
       end
     | SAttr (e, id) -> failwith "Not implemented"
@@ -66,47 +66,47 @@ let compile_program p ofile =
         
         
 
-  (** calcule en utilisant la pile et les registres A0 et A1,
-     stocke le résultat dans A0 *)
+  (** calcule en utilisant la pile et les registres V0 et T0,
+     stocke le résultat dans V0 *)
   and compile_expr expr env acc = match expr.sv with
-    | SIconst i -> Li (A0, i) :: acc
+    | SIconst i -> Li (V0, i) :: acc
     | SSconst s ->
       let adresse = "string_" ^ soi !string_nb in
       data := DLabel adresse :: Asciiz s :: !data ;
       incr string_nb ;
-      La (A0 , adresse) :: acc
-    | SBconst b -> Li (A0, int_of_bool b) :: acc
-    | SNull -> La (A0, "null") :: acc
-    | SNot e -> compile_expr e env (Arith (Mips.Eq, A0, A0, Oimm 0) :: acc)
-    | SUMinus e -> compile_expr e env (Neg (A0, A0) :: acc)
+      La (V0 , adresse) :: acc
+    | SBconst b -> Li (V0, int_of_bool b) :: acc
+    | SNull -> La (V0, "null") :: acc
+    | SNot e -> compile_expr e env (Arith (Mips.Eq, V0, V0, Oimm 0) :: acc)
+    | SUMinus e -> compile_expr e env (Neg (V0, V0) :: acc)
     | SPref (op, var) ->
       compile_vars var env (
-        Move (T0, A0) ::
-          Lw (A0, Areg (0, T0)) ::
+        Move (T0, V0) ::
+          Lw (V0, Areg (0, T0)) ::
           Arith ( begin match op with Incr -> Add | Decr -> Sub end ,
-            A0, A0, Oimm 1 ) ::
-          Sw (A0, Areg (0, T0)) :: acc )
+            V0, V0, Oimm 1 ) ::
+          Sw (V0, Areg (0, T0)) :: acc )
         (* la nouvelle valeur est replacée à l'adresse indiquée par T0
-           et reste dans A0 en tant que valeur de retour *)
+           et reste dans V0 en tant que valeur de retour *)
     | SPost (op, var) ->
       compile_vars var env (
-        Move (T0, A0) ::
-          Lw (A0, Areg (0, T0)) ::
+        Move (T0, V0) ::
+          Lw (V0, Areg (0, T0)) ::
           Arith ( begin match op with Incr -> Add | Decr -> Sub end ,
-            T1, A0, Oimm 1 ) ::
+            T1, V0, Oimm 1 ) ::
           Sw (T1, Areg (0, T0)) :: acc )
         (* la nouvelle valeur est replacée à l'adresse indiquée par T0 et
-           l'ancienne valeur reste dans A0 en tant que valeur de retour *)
+           l'ancienne valeur reste dans V0 en tant que valeur de retour *)
     | SBinaire (op, e1, e2) ->
       (* surcharges de + et de = non gérées :
          seulement fonctionne avec les ints et bool *)
       (* attention : l'évaluation de and et or doit être paresseuse *)
       compile_expr e1 env ( (* compile e1 et stocke sur la pile *)
-        Sw (A0, Areg (0, SP)) ::
+        Sw (V0, Areg (0, SP)) ::
           Arith (Sub, SP, SP, Oimm 4) ::
-          compile_expr e2 env ( (* compile e2 et laisse dans A0 *)
+          compile_expr e2 env ( (* compile e2 et laisse dans V0 *)
             Arith (Add, SP, SP, Oimm 4) ::
-              Lw (A1, Areg (0, SP)) :: (* cherche la valeur de e1 *)
+              Lw (T0, Areg (0, SP)) :: (* cherche la valeur de e1 *)
               begin
               if e1.st = SInt & e2.st = SInt then
                 Arith (
@@ -121,13 +121,13 @@ let compile_program p ofile =
                       | Div -> Mips.Div | Mod -> Mips.Mod
                       | _ -> failwith "Typage mal fait"
                   end
-                    , A0, A1, Oreg A0 )
+                    , V0, T0, Oreg V0 )
                 :: acc
               else if e1.st = SBool & e2.st = SBool then
-                Arith (Mips.Neq, A0, A0, Oimm 0) ::
-              (* on renormalise : A0 != 0 devient 1 ; 0 reste 0
+                Arith (Mips.Neq, V0, V0, Oimm 0) ::
+              (* on renormalise : V0 != 0 devient 1 ; 0 reste 0
                  afin que la comparaison Eq ou Neq ait lieu correctement *)
-                  Arith (Mips.Neq, A1, A1, Oimm 0) ::
+                  Arith (Mips.Neq, T0, T0, Oimm 0) ::
                   Arith (
                     begin
                       match op with
@@ -136,7 +136,7 @@ let compile_program p ofile =
                       | And -> Mul
                       | _ -> failwith "Typage mal fait"
                   end
-                    , A0, A1, Oreg A0 )
+                    , V0, T0, Oreg V0 )
                 :: acc
               else failwith "Not implemented"
               (* rajouter les comparaisons généralisées et la concaténation 
@@ -145,14 +145,14 @@ let compile_program p ofile =
     | SAssign (var, e) ->
       (* compile la valeur gauche avant l'expression comme javac *)
       compile_vars var env ( (* compile var et stocke sur la pile *)
-        Sw (A0, Areg (0, SP)) ::
+        Sw (V0, Areg (0, SP)) ::
           Arith (Sub, SP, SP, Oimm 4) ::
-          compile_expr e env ( (* compile e et laisse dans A0 car ce sera
+          compile_expr e env ( (* compile e et laisse dans V0 car ce sera
                                   aussi la valeur de retour *)
               Arith (Add, SP, SP, Oimm 4) ::
               Lw (T0, Areg (0, SP)) :: (* cherche la valeur de var et place 
                                           dans T0 *)
-              Sw (A0, Areg (0, T0)) :: acc ) ) (* assign proprement dit *)
+              Sw (V0, Areg (0, T0)) :: acc ) ) (* assign proprement dit *)
     | SCall (e, i, args) ->
       (* détermine la méthode à appeler *)
       let label_methode =
@@ -169,22 +169,26 @@ let compile_program p ofile =
       in
       (* compile l'objet e et place sur la pile *)
       compile_expr e env (
-        Sw (A0, Areg (0, SP)) ::
+        Sw (V0, Areg (0, SP)) ::
           Arith (Sub, SP, SP, Oimm 4) ::
           (* évalue les arguments de gauche à droite *)
           List.fold_right
           (fun expr acc -> compile_expr expr env
             (Arith (Sub, SP, SP, Oimm 4) :: acc) )
           args
-          (Jal label_methode :: acc) )
+          (Jal label_methode
+           :: Arith(Add, SP, SP, Oimm ((List.length args + 1) * 4))
+           (* désalloue la place qu'occupaient les arguments *)
+           :: acc) )
     | SGetval var ->
       (* la variable considérée est toujours un mot (4 octets) *)
       compile_vars var env (
-        Lw (A0, Areg (0, A0)) :: acc )
+        Lw (V0, Areg (0, V0)) :: acc )
 (*    | SNew (name, constr, args) ->*)
       
     | SPrint e ->
       compile_expr e env (
+        Move (A0, V0) ::
         Jal "print" :: acc )
     | _ -> failwith "Not implemented"
   in
@@ -221,7 +225,7 @@ let compile_program p ofile =
                 | None -> function acc -> acc
             end (
               Arith (Add, T0, FP, Oimm pos) :: (* calcule la position *)
-                Sw (A0, Areg (0, T0)) :: (* enregistre la valeur *)
+                Sw (V0, Areg (0, T0)) :: (* enregistre la valeur *)
                 (* si elle n'a pas été calculée la valeur n'est pas
                    définie *)
                 t ) , frame_size
@@ -246,7 +250,7 @@ let compile_program p ofile =
             let t , frame_size =
               compile_instr i frame_size t
             in
-            compile_expr e env ( Beqz (A0, label_else_ou_fin) :: t ) ,
+            compile_expr e env ( Beqz (V0, label_else_ou_fin) :: t ) ,
             frame_size
           | SFor (e1, e2, e3, i) ->
             let label_debut = "for_debut_" ^ (soi !for_nb) in
@@ -275,7 +279,7 @@ let compile_program p ofile =
             end (
               Label label_debut ::
                 compile_expr e2 env (
-                  Beqz (A0, label_fin) ::
+                  Beqz (V0, label_fin) ::
                     t ) ) , frame_size
           | SBlock instrs ->
             let t , frame_size =
@@ -326,11 +330,10 @@ let compile_program p ofile =
       body @
       [Arith (Add, SP, SP, Oimm (-frame_size)); (* désalloue la frame *)
        Lw (RA, Areg(0, SP)); (* récupère la valeur de RA *)
-       Lw (FP, Areg(4, SP)); (* et celle de FP de l'appelant *)
-       Arith (Add, SP, SP, Oimm ((List.length meth.scall_params + 2) * 4) );
-       (* désalloue la place qu'occupaient les arguments *)
+       Arith (Add, SP, SP, Oimm 4);
+       Lw (FP, Areg(0, SP)); (* et celle de FP de l'appelant *)
        Jr RA] @ acc
-       (* remarque : la valeur de retour se trouve déjà dans A0 *)
+       (* remarque : la valeur de retour se trouve déjà dans V0 *)
   in   
       
   let main =
