@@ -30,9 +30,11 @@ type instruction =
   | Syscall
   | Label of string
 
-type data = 
-  | Asciiz of string * string
-  | Word of string * int
+type data =
+  | DLabel of string
+  | Asciiz of string
+  | Word of int
+  | AWord of string
 
 type program = {
   text : instruction list;
@@ -103,10 +105,14 @@ let print_instruction fmt = function
     fprintf fmt "%s:" s
 
 let print_data fmt = function
-  | Asciiz (l, s) -> 
-    fprintf fmt "%s:\t.asciiz %S\n" l s
-  | Word (l, n) ->
-    fprintf fmt "%s:\t.word %d\n" l n
+  | DLabel s ->
+    fprintf fmt "%s:\n" s
+  | Asciiz s -> 
+    fprintf fmt "\t.asciiz %S\n" s
+  | Word n ->
+    fprintf fmt "\t.word %d\n" n
+  | AWord s ->
+    fprintf fmt "\t.word %s\n" s
 
 let print_program fmt p =
   fprintf fmt "\t.text\n";

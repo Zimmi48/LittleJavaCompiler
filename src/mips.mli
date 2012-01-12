@@ -31,8 +31,10 @@ type instruction =
   | Label of string
 
 type data = 
-  | Asciiz of string * string
-  | Word of string * int
+  | DLabel of string
+  | Asciiz of string
+  | Word of int
+  | AWord of string
 
 type program = {
   text : instruction list;
