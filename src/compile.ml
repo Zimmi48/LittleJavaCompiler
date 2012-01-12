@@ -142,49 +142,52 @@ let compile_program p ofile =
         Jal "print" :: acc )
     | _ -> failwith "Not implemented"
   in
-  let rec compile_instr instr env acc = match instr with
-    | SExpr e -> compile_expr e env acc
-    | SIf (e, i, Some i') ->
-      let label_else = "else" ^ (soi !condition_nb) in
-      let label_fin = "endif" ^ (soi !condition_nb) in
-      incr condition_nb ;
-      compile_expr e env (
-        Beqz (A0, label_else) ::
-          compile_instr i env (
-            Label label_else ::
-              compile_instr i' env (
-                Label label_fin :: acc ) ) )
-    | SIf (e, i, None) ->
-      let label_fin = "endif" ^ (soi !condition_nb) in
-      incr condition_nb ;
-      compile_expr e env (
-        Beqz (A0, label_fin) ::
-          compile_instr i env (
-            Label label_fin :: acc ) )
-    | SFor (e1, e2, e3, i) ->
-      let label_debut = "for_debut" ^ (soi !for_nb) in
-      let label_fin = "for_fin" ^ (soi !for_nb) in
-      incr for_nb ;
-      begin (* initialisation *)
-        match e1 with
-          | Some e -> compile_expr e env
-          | None -> function acc -> acc
-      end (
-        Label label_debut ::
-          compile_expr e2 env (
+  (** compile une liste d'instructions et fait suivre le résultat de acc *)
+  let rec compile_instrs instrs env acc = match instrs with
+    | [] -> acc
+    | instr :: t -> match instr with
+        | SExpr e -> compile_expr e env (compile_instrs t env acc)
+        | SIf (e, i, Some i') ->
+          let label_else = "else" ^ (soi !condition_nb) in
+          let label_fin = "endif" ^ (soi !condition_nb) in
+          incr condition_nb ;
+          compile_expr e env (
+            Beqz (A0, label_else) ::
+              compile_instr i env (
+                Label label_else ::
+                  compile_instr i' env (
+                    Label label_fin :: (compile_instrs t env acc) ) ) )
+        | SIf (e, i, None) ->
+          let label_fin = "endif" ^ (soi !condition_nb) in
+          incr condition_nb ;
+          compile_expr e env (
             Beqz (A0, label_fin) ::
-              begin (* instruction *)
-                match i with
-                  | Some i -> compile_instr i env
-                  | None -> function acc -> acc
-              end (
-                begin (* incrémentation *)
-                  match e3 with
-                    | Some e -> compile_expr e env
-                    | None -> function acc -> acc
-                end (
-                  Label label_fin :: acc ) ) ) )        
-    | _ -> failwith "Not implemented"
+              compile_instr i env (
+                Label label_fin :: (compile_instrs t env acc) ) )
+        | SFor (e1, e2, e3, i) ->
+          let label_debut = "for_debut" ^ (soi !for_nb) in
+          let label_fin = "for_fin" ^ (soi !for_nb) in
+          incr for_nb ;
+          begin (* initialisation *)
+            match e1 with
+              | Some e -> compile_expr e env
+              | None -> function acc -> acc
+          end (
+            Label label_debut ::
+              compile_expr e2 env (
+                Beqz (A0, label_fin) ::
+                  begin (* instruction *)
+                    match i with
+                      | Some i -> compile_instr i env
+                      | None -> function acc -> acc
+                  end (
+                    begin (* incrémentation *)
+                      match e3 with
+                        | Some e -> compile_expr e env
+                        | None -> function acc -> acc
+                    end (
+                      Label label_fin :: (compile_instrs t env acc) ) ) ) )
+        | _ -> failwith "Not implemented"
   in
   let instrs =
     Label "main" ::
