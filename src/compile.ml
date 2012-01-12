@@ -5,7 +5,6 @@ open Format
 (* A faire :
    Lors de la compilation d'une méthode.
    calcul de la taille du tableau d'activation pour chaque méthode
-   les variables définies à l'intérieur de blocs sont comptées
    idem pour le main *)
 
 module Smap = Map.Make(String)
@@ -38,7 +37,7 @@ let compile_program p ofile =
       try let pos_relative = Smap.find id env in
           (* la variable doit être locale à la méthode car on aura rajouté
              this devant sinon au typage *)
-          Arith (Add, A0, FP, Oimm pos_relative) :: acc
+          Arith (Sub, A0, FP, Oimm pos_relative) :: acc
       with Not_found -> failwith "Variable inconnue. Analyse de portée mal faite !"
       end
     | SAttr (e, id) -> failwith "Not implemented"
@@ -142,52 +141,77 @@ let compile_program p ofile =
         Jal "print" :: acc )
     | _ -> failwith "Not implemented"
   in
-  (** compile une liste d'instructions et fait suivre le résultat de acc *)
-  let rec compile_instrs instrs env acc = match instrs with
-    | [] -> acc
-    | instr :: t -> match instr with
-        | SExpr e -> compile_expr e env (compile_instrs t env acc)
-        | SIf (e, i, Some i') ->
-          let label_else = "else" ^ (soi !condition_nb) in
-          let label_fin = "endif" ^ (soi !condition_nb) in
-          incr condition_nb ;
-          compile_expr e env (
-            Beqz (A0, label_else) ::
-              compile_instr i env (
-                Label label_else ::
-                  compile_instr i' env (
-                    Label label_fin :: (compile_instrs t env acc) ) ) )
-        | SIf (e, i, None) ->
-          let label_fin = "endif" ^ (soi !condition_nb) in
-          incr condition_nb ;
-          compile_expr e env (
-            Beqz (A0, label_fin) ::
-              compile_instr i env (
-                Label label_fin :: (compile_instrs t env acc) ) )
-        | SFor (e1, e2, e3, i) ->
-          let label_debut = "for_debut" ^ (soi !for_nb) in
-          let label_fin = "for_fin" ^ (soi !for_nb) in
-          incr for_nb ;
-          begin (* initialisation *)
-            match e1 with
-              | Some e -> compile_expr e env
-              | None -> function acc -> acc
-          end (
-            Label label_debut ::
-              compile_expr e2 env (
-                Beqz (A0, label_fin) ::
-                  begin (* instruction *)
-                    match i with
-                      | Some i -> compile_instr i env
-                      | None -> function acc -> acc
-                  end (
-                    begin (* incrémentation *)
-                      match e3 with
-                        | Some e -> compile_expr e env
+  (** compile une liste d'instructions et fait suivre le résultat de acc
+      retient la dernière position occupée
+      et la taille de frame nécessaire *)
+  let rec compile_instrs instrs env pos frame_size acc =
+    match instrs with
+      | [] -> acc
+      | instr :: t -> match instr with
+          | SExpr e ->
+            compile_expr e env (compile_instrs t env pos frame_size acc)
+          | SDecl (_, _, id, e) ->
+            begin
+              match e with
+                | Some e -> compile_expr e env
+                | None -> function acc -> acc
+            end (
+              let frame_size =
+                if pos = frame_size then frame_size + 4 else frame_size
+              in
+              let pos = pos + 4 in
+              Arith (Sub, T0, FP, Oimm nb_vars) :: (* calcule la position *)
+                Sw (A0, Areg (0, T0)) :: (* enregistre la valeur *)
+        (* si elle n'a pas été calculée la valeur n'est pas
+           définie *)
+                (compile_instrs
+                   t
+                   (Smap.add id.id_id pos env) (* ajoute l'id à l'env *)
+                   pos frame_size acc) )
+          | SIf (e, i, Some i') ->
+            let label_else = "else" ^ (soi !condition_nb) in
+            let label_fin = "endif" ^ (soi !condition_nb) in
+            incr condition_nb ;
+            compile_expr e env (
+              Beqz (A0, label_else) ::
+                compile_instr i env (
+                  Label label_else ::
+                    compile_instr i' env (
+                      Label label_fin ::
+                        (compile_instrs t env pos frame_size acc) ) ) )
+          | SIf (e, i, None) ->
+            let label_fin = "endif" ^ (soi !condition_nb) in
+            incr condition_nb ;
+            compile_expr e env (
+              Beqz (A0, label_fin) ::
+                compile_instr i env (
+                  Label label_fin ::
+                    (compile_instrs t env pos frame_size acc) ) )
+          | SFor (e1, e2, e3, i) ->
+            let label_debut = "for_debut" ^ (soi !for_nb) in
+            let label_fin = "for_fin" ^ (soi !for_nb) in
+            incr for_nb ;
+            begin (* initialisation *)
+              match e1 with
+                | Some e -> compile_expr e env
+                | None -> function acc -> acc
+            end (
+              Label label_debut ::
+                compile_expr e2 env (
+                  Beqz (A0, label_fin) ::
+                    begin (* instruction *)
+                      match i with
+                        | Some i -> compile_instr i env
                         | None -> function acc -> acc
                     end (
-                      Label label_fin :: (compile_instrs t env acc) ) ) ) )
-        | _ -> failwith "Not implemented"
+                      begin (* incrémentation *)
+                        match e3 with
+                          | Some e -> compile_expr e env
+                          | None -> function acc -> acc
+                      end (
+                        Label label_fin ::
+                          (compile_instrs t env pos frame_size acc) ) ) ) )
+          | _ -> failwith "Not implemented"
   in
   let instrs =
     Label "main" ::
