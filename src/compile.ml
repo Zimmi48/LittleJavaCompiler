@@ -135,7 +135,14 @@ let compile_program p ofile =
       (* détermine la méthode à appeler *)
       let label_methode =
         match e.st with
-            SC classe -> failwith "Not implemented" (* à compléter*)
+            SC classe ->
+              begin
+                try
+                  let classe = Cmap.find classe p.sclasses in
+                  let j = classe.sclass_methods.(i) in
+                  "debut_meth_" ^ soi j
+                with Not_found -> failwith "Classe inconnue"
+              end
           | _ -> failwith "Typage mal fait"
       in
       (* compile l'objet e et place sur la pile *)
@@ -152,6 +159,7 @@ let compile_program p ofile =
       (* la variable considérée est toujours un mot (4 octets) *)
       compile_vars var env (
         Lw (A0, Areg (0, A0)) :: acc )
+(*    | SNew -> *)
     | SPrint e ->
       compile_expr e env (
         Jal "print" :: acc )
@@ -331,7 +339,7 @@ let compile_program p ofile =
        Syscall;
        Jr RA] in
   let n = Array.length p.smeths in
-  for i = 0 to n do
+  for i = 0 to n - 1 do
     methodes := compile_meth p.smeths.(i) i !methodes
   done;
 
@@ -340,14 +348,27 @@ let compile_program p ofile =
   (** compilation des classes : crée un descripteur à placer dans le tas
       suivi de acc *)
   let compile_classe name classe acc =
-    DLabel ("descr_" ^ name) ::
-      begin
+    let methodes = ref [] in (* rajouter String *)
+    let n = Array.length classe.sclass_methods in
+    for i = n - 1 downto 0 do
+      methodes := AWord ("debut_meth_" ^ soi classe.sclass_methods.(i) )
+        :: !methodes
+    done;
+    let constructeurs = ref [] in
+    let n = Array.length classe.sclass_consts in
+    for i = n - 1 downto 0 do
+      constructeurs := AWord ("debut_meth_" ^ soi classe.sclass_consts.(i) )
+        :: !constructeurs
+    done;
+    DLabel ("descr_general_" ^ name) ::
+      begin (* la classe parent *)
         match classe.sclass_extends with
-            Some s -> AWord ("descr_" ^ s)
-          | None -> AWord 0
+            Some s -> AWord ("descr_" ^ s.id_id)
+          | None -> Word 0
       end ::
-      
-          
+      !constructeurs @
+      DLabel ("descr_meth_" ^ name) ::
+      !methodes
   in
      
 
