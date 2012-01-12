@@ -60,10 +60,17 @@ let compile_program p ofile =
           Arith (Add, V0, FP, Oimm pos_relative) :: acc
       with Not_found -> failwith "Variable inconnue. Analyse de portée mal faite !"
       end
-    | SAttr (e, id) -> failwith "Not implemented"
-(* D'abord compiler les classes
-      compile e env ( *)
-        
+    | SAttr (e, id) ->
+      try
+        match e.st with
+          | SC classe ->
+            compile_expr e env (
+              let pos = Cmap.find id.id_id (Cmap.find classe !classe_attrs) 
+              in
+              let pos = (pos + 1) * 4 in
+              Lw (V0, Areg(pos, V0)) :: acc )
+          | _ -> failwith "Typage mal fait : n'est pas un objet."
+      with Not_found -> failwith "Erreur 42"
         
 
   (** calcule en utilisant la pile et les registres V0 et T0,
@@ -154,17 +161,9 @@ let compile_program p ofile =
                                           dans T0 *)
               Sw (V0, Areg (0, T0)) :: acc ) ) (* assign proprement dit *)
     | SCall (e, i, args) ->
-      (* détermine la méthode à appeler *)
-      let label_methode =
+      let label_descripteur =
         match e.st with
-            SC classe ->
-              begin
-                try
-                  let classe = Cmap.find classe p.sclasses in
-                  let j = classe.sclass_methods.(i) in
-                  "debut_meth_" ^ soi j
-                with Not_found -> failwith "Classe inconnue"
-              end
+          | SC classe -> "descr_meth_" ^ classe
           | _ -> failwith "Typage mal fait"
       in
       (* compile l'objet e et place sur la pile *)
@@ -176,7 +175,9 @@ let compile_program p ofile =
           (fun expr acc -> compile_expr expr env
             (Arith (Sub, SP, SP, Oimm 4) :: acc) )
           args
-          (Jal label_methode
+          (La (T0, label_descripteur)
+           :: Lw (T0, Areg(4 * i, T0) )
+           :: Jalr (T0, RA)
            :: Arith(Add, SP, SP, Oimm ((List.length args + 1) * 4))
            (* désalloue la place qu'occupaient les arguments *)
            :: acc) )
