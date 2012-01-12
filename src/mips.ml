@@ -25,6 +25,7 @@ type instruction =
   | Neg of register * register
   | Jal of string
   | Jr of register
+  | J of string
   | Beqz of register * string
   | Syscall
   | Label of string
@@ -74,36 +75,38 @@ let print_operand fmt = function
 
 let print_instruction fmt = function
   | Move (dst, src) -> 
-      fprintf fmt "\tmove %a, %a\n" print_register dst print_register src
+    fprintf fmt "\tmove %a, %a\n" print_register dst print_register src
   | Li (r, i) ->
-      fprintf fmt "\tli   %a, %d\n" print_register r i
+    fprintf fmt "\tli   %a, %d\n" print_register r i
   | La (r, s) ->
-      fprintf fmt "\tla   %a, %s\n" print_register r s
+    fprintf fmt "\tla   %a, %s\n" print_register r s
   | Lw (r, a) ->
-      fprintf fmt "\tlw   %a, %a\n" print_register r print_address a
+    fprintf fmt "\tlw   %a, %a\n" print_register r print_address a
   | Sw (r, a) ->
-      fprintf fmt "\tsw   %a, %a\n" print_register r print_address a
+    fprintf fmt "\tsw   %a, %a\n" print_register r print_address a
   | Arith (a, dst, src, op) ->
-      fprintf fmt "\t%a  %a, %a, %a\n" 
-	print_arith a print_register dst print_register src print_operand op
+    fprintf fmt "\t%a  %a, %a, %a\n" 
+      print_arith a print_register dst print_register src print_operand op
   | Neg (dst, src) -> fprintf fmt "\tneg   %a, %a\n"
     print_register dst print_register src
   | Jal s ->
-      fprintf fmt "\tjal  %s\n" s
+    fprintf fmt "\tjal  %s\n" s
   | Jr r ->
     fprintf fmt "\tjr   %a\n" print_register r
+  | J s ->
+    fprintf fmt "\tj  %s\n" s
   | Beqz (r,s) ->
     fprintf fmt "\tbeqz   %a, %s\n" print_register r s
   | Syscall ->
-      fprintf fmt "\tsyscall\n"
+    fprintf fmt "\tsyscall\n"
   | Label s ->
-      fprintf fmt "%s:" s
+    fprintf fmt "%s:" s
 
 let print_data fmt = function
   | Asciiz (l, s) -> 
-      fprintf fmt "%s:\t.asciiz %S\n" l s
+    fprintf fmt "%s:\t.asciiz %S\n" l s
   | Word (l, n) ->
-      fprintf fmt "%s:\t.word %d\n" l n
+    fprintf fmt "%s:\t.word %d\n" l n
 
 let print_program fmt p =
   fprintf fmt "\t.text\n";

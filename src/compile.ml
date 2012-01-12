@@ -19,18 +19,13 @@ let compile_program p ofile =
   let data = ref [Word ("null", 0)] (* l'adresse de NULL *)
   in
   (** convention : SP pointe toujours sur le prochain mot libre de la pile*)
-  (** compilation d'une méthode
-      création du tableau d'activation, sauvegarde de RA et de FP
-      on considère que la totalité des arguments doivent être passés
-      sur la pile, ce qui sera donc le début du tableau d'activation ;
-      les instructions compilées sont placées devant l'accumulateur acc *)
- (* let compile_meth *)
 
   (** calcule l'adresse de var en utilisant la pile, stocke le
            résultat dans A0 ;
       env est une table d'association dont les clés sont les variables
       locales (des chaînes de caractères) et où la valeur associée est la
-      position par rapport à $fp (en octets) *)
+      position par rapport à $fp (en octets) ;
+      les instructions compilées sont placées devant l'accumulateur acc *)
   let rec compile_vars var env acc = match var with
     | SVar { id_id = id } ->
       begin
@@ -143,54 +138,78 @@ let compile_program p ofile =
   in
   (** compile une liste d'instructions et fait suivre le résultat de acc
       retient la dernière position occupée
-      et la taille de frame nécessaire *)
+      et la taille de frame nécessaire
+      renvoit un produit Mips list * int = code * frame_size *)
   let rec compile_instrs instrs env pos frame_size acc =
+    let compile_instr x = compile_instrs [x] in
     match instrs with
-      | [] -> acc
+      | [] -> acc , frame_size
       | instr :: t -> match instr with
           | SExpr e ->
-            compile_expr e env (compile_instrs t env pos frame_size acc)
+            let t , frame_size = compile_instrs t env pos frame_size acc in
+            compile_expr e env t , frame_size
           | SDecl (_, _, id, e) ->
+            let frame_size =
+              if pos = frame_size then frame_size + 4 else frame_size
+            in
+            let pos = pos + 4 in
+            let t , frame_size =
+              compile_instrs
+                t
+                (Smap.add id.id_id pos env) (* ajoute l'id à l'env *)
+                pos frame_size acc
+            in
             begin
               match e with
                 | Some e -> compile_expr e env
                 | None -> function acc -> acc
             end (
-              let frame_size =
-                if pos = frame_size then frame_size + 4 else frame_size
-              in
-              let pos = pos + 4 in
-              Arith (Sub, T0, FP, Oimm nb_vars) :: (* calcule la position *)
+              Arith (Sub, T0, FP, Oimm pos) :: (* calcule la position *)
                 Sw (A0, Areg (0, T0)) :: (* enregistre la valeur *)
-        (* si elle n'a pas été calculée la valeur n'est pas
-           définie *)
-                (compile_instrs
-                   t
-                   (Smap.add id.id_id pos env) (* ajoute l'id à l'env *)
-                   pos frame_size acc) )
-          | SIf (e, i, Some i') ->
-            let label_else = "else" ^ (soi !condition_nb) in
+                (* si elle n'a pas été calculée la valeur n'est pas
+                   définie *)
+                t ) , frame_size
+          | SIf (e, i, i') ->
             let label_fin = "endif" ^ (soi !condition_nb) in
+            let label_else_ou_fin =
+              if i' = None then label_fin
+              else "else" ^ (soi !condition_nb) in
             incr condition_nb ;
-            compile_expr e env (
-              Beqz (A0, label_else) ::
-                compile_instr i env (
-                  Label label_else ::
-                    compile_instr i' env (
-                      Label label_fin ::
-                        (compile_instrs t env pos frame_size acc) ) ) )
-          | SIf (e, i, None) ->
-            let label_fin = "endif" ^ (soi !condition_nb) in
-            incr condition_nb ;
-            compile_expr e env (
-              Beqz (A0, label_fin) ::
-                compile_instr i env (
-                  Label label_fin ::
-                    (compile_instrs t env pos frame_size acc) ) )
+            let t , frame_size = compile_instrs t env pos frame_size acc in
+            let t , frame_size =
+              match i' with
+                | Some i' ->
+                  let t , frame_size =
+                    compile_instr i' env pos frame_size
+                      (Label label_fin :: t)
+                  in
+                  J label_fin :: Label label_else_ou_fin :: t , frame_size
+                | None -> Label label_else_ou_fin :: t , frame_size
+            in
+            let t , frame_size =
+              compile_instr i env pos frame_size t
+            in
+            compile_expr e env ( Beqz (A0, label_else_ou_fin) :: t ) ,
+            frame_size
           | SFor (e1, e2, e3, i) ->
             let label_debut = "for_debut" ^ (soi !for_nb) in
             let label_fin = "for_fin" ^ (soi !for_nb) in
             incr for_nb ;
+            let t , frame_size = compile_instrs t env pos frame_size acc in
+            let t , frame_size =
+              begin (* instruction *)
+                match i with
+                  | Some i -> compile_instr i env pos frame_size
+                  | None -> function acc -> acc , frame_size
+              end (
+                begin (* incrémentation *)
+                  match e3 with
+                    | Some e -> compile_expr e env
+                    | None -> function acc -> acc
+                end (
+                  Label label_fin ::
+                    t ) )
+            in
             begin (* initialisation *)
               match e1 with
                 | Some e -> compile_expr e env
@@ -199,26 +218,27 @@ let compile_program p ofile =
               Label label_debut ::
                 compile_expr e2 env (
                   Beqz (A0, label_fin) ::
-                    begin (* instruction *)
-                      match i with
-                        | Some i -> compile_instr i env
-                        | None -> function acc -> acc
-                    end (
-                      begin (* incrémentation *)
-                        match e3 with
-                          | Some e -> compile_expr e env
-                          | None -> function acc -> acc
-                      end (
-                        Label label_fin ::
-                          (compile_instrs t env pos frame_size acc) ) ) ) )
+                    t ) ) , frame_size
+          | SBlock instrs ->
+            let t , frame_size = compile_instrs t env pos frame_size acc in
+            compile_instrs instrs env pos frame_size t
           | _ -> failwith "Not implemented"
   in
+
+
+  (** compilation d'une méthode
+      création du tableau d'activation, sauvegarde de RA et de FP
+      on considère que la totalité des arguments doivent être passés
+      sur la pile, ce qui sera donc le début du tableau d'activation *)
+ (* let compile_meth *)
+
+
   let instrs =
     Label "main" ::
       Move (S0, RA) ::
 (*     Arith (Mips.Sub, SP, SP, Oimm !frame_size); (* Alloue la frame *)
        Arith (Mips.Add, FP, SP, Oimm (!frame_size - 4)) (* Initialise $fp *)*)
-      compile_instr p.sinstr Smap.empty [
+      fst (compile_instrs [p.sinstr] Smap.empty 0 0 [
         (* fin de main *)
         (*        Arith (Mips.Add, SP, SP, Oimm !frame_size); (* Désalloue la frame *)*)
         Move (RA, S0);
@@ -227,7 +247,7 @@ let compile_program p ofile =
         Li (V0, 1);
         Syscall;
         Jr RA      
-      ] in
+      ] ) in
   let p = { text = instrs ; data = !data } in
   let f = open_out ofile in
   let fmt = formatter_of_out_channel f in

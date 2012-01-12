@@ -25,6 +25,7 @@ type instruction =
   | Neg of register * register
   | Jal of string
   | Jr of register
+  | J of string
   | Beqz of register * string
   | Syscall
   | Label of string
