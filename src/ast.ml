@@ -139,22 +139,19 @@ end
 (** syntaxe issue de l'analyse et du typage des classes *) 
 module Oast = struct 
   include Past 
-
-  (** les méthodes et constructeurs *)
-  type ocallable = {
-    ocall_pos : pos;
-    ocall_returnType : types;
-    ocall_name : ident;
-    ocall_params : variable list;
-    ocall_body : instruction;
-  }
       
   (** Les méthodes/constructeurs dans le descripteur *)
   type oSimple = {
     osimple_id : int ;
-    osimple_cid : int ;
+    osimple_classe : string ;
+    osimple_n : int;
     osimple_params : variable list;
     osimple_name : string;
+  }
+      
+  type ocallable = { 
+    ocall_params : variable list ;
+    ocall_body : instruction;
   }
       
   (** représentation d'une classe *)
@@ -170,20 +167,15 @@ module Oast = struct
     oclass_methodesdesc : oSimple list;
     (** descripteur des constructeur *)
     oclass_constsdesc : oSimple list;
-    (** liste des constructeurs *)
-    oclass_consts : ocallable list;
-    (** la Map des méthodes, pouvant avoir des noms identiques *)
-    oclass_methods : (int list) Cmap.t;
-    (** nombre de méthodes *)
-    oclass_cm : int ;
+    (** nombre de const/méthodes définis dans la classe courante *)
+    oclass_nconst : int;
+    oclass_nmeth : int ;
     
   }
 
   type oprog = {
     (** Map des classes *)
     oclasses : oclasse Cmap.t ;
-    (** Map de toutes les méthodes et des constructeurs *)
-    ocall : ocallable Imap.t ;
     (** liste des instructions dans main*)
     oinstr : instruction;
   }
@@ -213,9 +205,7 @@ module Sast = struct
 
   (** les méthodes et constructeurs *)
   and scallable = {
-    scall_pos : pos;
     scall_returnType : stypes;
-    scall_name : string;
     scall_params : sident list;
     scall_body : sinstruction;
   }
@@ -262,9 +252,7 @@ module Sast = struct
     | SBlock of sinstruction list
     (** Expression optionnelles, pour les méthodes void *)
     | SReturn of sexpr option
-
-
-        
+	
   (** représentation d'une classe *)
   type sclasse = {
     sclass_pos : pos ;
@@ -284,8 +272,8 @@ module Sast = struct
   type sprog = {
     (** liste des classes *)
     sclasses : sclasse Cmap.t ;
-    (** map de toutes les méthodes et des constructeurs *)
-    scall : scallable array;
+    (** Tableau des méthodes **)
+    smeths : scallable array;
     (** liste des instructions dans main*)
     sinstr : sinstruction ;
   }

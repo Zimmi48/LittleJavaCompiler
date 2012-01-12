@@ -35,6 +35,9 @@ module Exceptions = struct
 
   (**N'est pas une valeur gauche **)
   exception NotALeftValue of pos
+
+  (** Le constructeur n'as pas le bon nom  nom du const * nom de la classe*)
+  exception BadConst of pos * string * string 
       
 
 end
@@ -99,35 +102,40 @@ module ClassAnalysis = struct
       in
       List.for_all checkParams call.call_params
 	
-  (** Vérifie que call et tout les élements de la liste ont des profils différents*)
-  let isDiff liste call = 
+  (** Vérifie que le callable et l'ensemble des profils de la liste sont différents *)
+  let isDiff  liste call = 
     (* compare deux profils *)
-    let comp  c2 = 
+    let comp  p = 
       try
-	List.for_all2 (fun v1 v2 -> v1.v_type != v2.v_type) call.ocall_params c2.ocall_params
-      with  Invalid_argument _ -> (raise (AlreadyDefined(call.ocall_pos, call.ocall_name,None)))
+	List.for_all2 (fun v1 v2 -> v1.v_type != v2.v_type) p call.call_params 
+      with  Invalid_argument _ -> (raise (AlreadyDefined(call.call_pos, call.call_name,None)))
     in 
-    (* on compare tout avec les profils *)
-    if List.for_all comp liste then 
-      try 
-	List.tl liste 
-      with Failure _ -> []
-    else
-      (raise (AlreadyDefined(call.ocall_pos,call.ocall_name,None)))
-
+    if not (List.for_all comp liste)  then 
+      (raise (AlreadyDefined(call.call_pos,call.call_name,None)))
 	
+  (** Vrai si les deux profils sont différents *)
+  let isDiff p1 p2 =
+    try 
+      List.for_all2 (fun v1 v2 -> v1.v_type != v2.v_type) p1 p2
+    with Invalid_argument _  -> true
+      
+  (** compare tout les callables de liste avec call pour vérifier qu'ils ont des profils différents *)
+  let isDiffForAll methods call liste ->
+    let liste = Liste.map 
+      
   (** vérifie les constructeurs, renvoit la liste* sa taille si aucune exception n'est levée*)
   let checkConst classes c =
     (* vérifie que tout les constructeurs ont des profils différents *)    
-    if List.for_all (isBFCall classes) c.class_consts  then
+    if List.for_all (isBFCall classes) c.class_consts  then 
    
-      let li,n = List.fold_left (fun (acclist,n) elt -> 
-	(({ocall_pos = elt.call_pos ;
-	  ocall_id = n;
-	  ocall_returnType = elt.call_returnType;
-	  ocall_name = elt.call_name;
-	  ocall_params = elt.call_params;
-	  ocall_body = elt.call_body })::acclist),(n+1)) ([],0) c.class_consts 
+      let li = List.map (fun elt -> 
+	if elt.call_name != c.class_name then 
+	  (raise (BadConst(elt.class_pos,c.class_name,elt.call_name)));
+	{ocall_pos = elt.call_pos ;
+	 ocall_returnType = elt.call_returnType;
+	 ocall_name = elt.call_name;
+	 ocall_params = elt.call_params;
+	 ocall_body = elt.call_body }) ([],0) c.class_consts 
       in
       let tail = 
 	try
@@ -139,6 +147,35 @@ module ClassAnalysis = struct
       li,n
     else
       [],0
+
+    (** Vérifie les méthodes de la classe c, ajoute les méthodes ) la map methods
+	de taille !index, en construisant le descripteur de classe à partir de desc *)
+  let checkMethods classes  d c =
+    let size = ref (List.length d)  in
+    let _ = List.for_all (isBFCall classes) c.class_methods in
+    (* ajoute les méthodes à l'environnement, et construit la liste  *)
+    let bMapandList (accMeth,accMap,desc) m = 
+      let i = !index in
+      let s = {
+	osimple_id = accMeth.os;
+	osimple_cid = size ;
+	osimple_params = m.call_params;
+	osimple_name = m.call_name;
+      } in
+      incr size;
+      let l = 
+	try 
+	  Cmap.find m.call_name accMap
+	with Not_found -> []
+      in
+      ({om = Imap.add i m accMeth; os = accMeth.os + 1},(Cmap.add m.call_name (i::l)),(s::desc))
+    in
+    (* construction de la table des méthodes, du descripteur, et l'ensmble des méthodes *)
+    let methods,mMap,d = List.fold_left bMapandList (methods,Cmap.empty,d) in
+    let _ = isDiff 
+    
+      
+      
 
   (** construit une Map des méthodes de la classe en vérifiant que tout est correct *)
   let checkMethods  classes c =
