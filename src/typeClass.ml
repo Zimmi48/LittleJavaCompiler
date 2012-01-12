@@ -38,7 +38,7 @@ module Exceptions = struct
 
   (** Le constructeur n'as pas le bon nom  nom du const * nom de la classe*)
   exception BadConst of pos * string * string 
-      
+
 
 end
 
@@ -49,17 +49,43 @@ module ClassAnalysis = struct
   open Exceptions
   open Oast
   open Past 
+  
+  (* PAST TO ZAST *)
+  let emptyPos = {  
+    file = "Internal";
+    line = 0;
+    fChar = 0;
+    lChar =  0;
+  }
     
-  (**    construit une Map de classes en vérifiant l'unicité du nommage *)
+  (**construit une Map de classes en vérifiant l'unicité du nommage *)
   let buildClassMap prog =
-    let    addClass map c =
+    let addClass (map,hmap) c =
+      if c.class_name == "Object" or c.class_name == "String" then 
+	raise (AlreadyDefined (c.class_pos,c.class_name,None)) ;
       if Cmap.mem c.class_name map then
 	let c1 = Cmap.find c.class_name map in
 	raise (AlreadyDefined (c.class_pos,c.class_name,  Some (c1.class_pos)))
-      else
-	Cmap.add c.class_name c map in
-    List.fold_left addClass Cmap.empty prog.classes 
+      else (
+	let hmap = (match c.class_extends with 
+	  | None -> 
+	    let obj = Cmap.find "Object" hmap in
+	    Cmap.add "Object" ((c.class_name,emptyPos)::obj) hmap 
+	  | Some ("String",p) -> raise (Her(p,c.class_name,"Ne peut pas hériter de String")) 
+	  | Some (n,p) -> 
+	    let c2 = (
+	      try 
+		Cmap.find n hmap 
+	      with Not_found -> [] )in
+	    Cmap.add n ((c.class_name,p)::c2) hmap
+	)
+	in
+	((Cmap.add c.class_name c map),hmap)) in
+    let hmap = Cmap.add "String" [] Cmap.empty in
+    let hmap = Cmap.add "Object" [("String",emptyPos)] hmap in      
+    List.fold_left addClass (Cmap.empty,hmap) prog.classes
    
+  (* ZAST TO OAST *)
 
   (** vérifie si le type est bien formé *)
   let isBF classes = function
@@ -67,7 +93,6 @@ module ClassAnalysis = struct
     | C "Object" | C "String" -> true
     | C c -> Cmap.mem c classes
     | _ -> false 
-  
       
   (** vérfie l'unicité des champs et que leurs types soient bien formés
       renvoit la map des attributs *)
@@ -85,190 +110,180 @@ module ClassAnalysis = struct
     in
     List.fold_left aux Cmap.empty c.class_attrs 
       
-  (** vérifie qu'un profil prend bien une liste d'arguments de noms différents 
-      renvoit un booléen *)
+  (** vérifie qu'un profil prend bien une liste d'arguments de noms différents *)
   let isBFCall classes call = 
     let accSet = ref Cset.empty in
       let checkParams v = 
 	if Cset.mem v.v_name !accSet then 
-	  (raise (AlreadyDefined ( call.call_pos, v.v_name, None)))
+	  (raise (Duplicated ( call.call_pos, v.v_name)))
 	else 
 	  begin
 	    if (isBF classes v.v_type ) then
-	      (accSet := (Cset.add v.v_name !accSet) ; true)
+	      (accSet := (Cset.add v.v_name !accSet) ;)
 	    else
-		(raise (WrongType( call.call_pos, types_to_Sast v.v_type ,None)))
+		(raise (WrongType(call.call_pos, types_to_Sast v.v_type ,None)))
 	  end
       in
-      List.for_all checkParams call.call_params
+      List.iter checkParams call.call_params
 	
-  (** Vérifie que le callable et l'ensemble des profils de la liste sont différents *)
-  let isDiff  liste call = 
-    (* compare deux profils *)
-    let comp  p = 
-      try
-	List.for_all2 (fun v1 v2 -> v1.v_type != v2.v_type) p call.call_params 
-      with  Invalid_argument _ -> (raise (AlreadyDefined(call.call_pos, call.call_name,None)))
-    in 
-    if not (List.for_all comp liste)  then 
-      (raise (AlreadyDefined(call.call_pos,call.call_name,None)))
-	
-  (** Vrai si les deux profils sont différents *)
-  let isDiff p1 p2 =
-    try 
-      List.for_all2 (fun v1 v2 -> v1.v_type != v2.v_type) p1 p2
-    with Invalid_argument _  -> true
+  (** compare deux profils (liste de variable) *)
+  let isDiffProf p1 p2 = 
+    try
+      List.for_all2 (fun v1 v2 -> v1.v_type != v2.v_type) p1 p2  
+    with  Invalid_argument _ -> true
       
-  (** compare tout les callables de liste avec call pour vérifier qu'ils ont des profils différents *)
-  let isDiffForAll methods call liste ->
-    let liste = Liste.map 
-      
-  (** vérifie les constructeurs, renvoit la liste* sa taille si aucune exception n'est levée*)
-  let checkConst classes c =
-    (* vérifie que tout les constructeurs ont des profils différents *)    
-    if List.for_all (isBFCall classes) c.class_consts  then 
-   
-      let li = List.map (fun elt -> 
-	if elt.call_name != c.class_name then 
-	  (raise (BadConst(elt.class_pos,c.class_name,elt.call_name)));
-	{ocall_pos = elt.call_pos ;
-	 ocall_returnType = elt.call_returnType;
-	 ocall_name = elt.call_name;
-	 ocall_params = elt.call_params;
-	 ocall_body = elt.call_body }) ([],0) c.class_consts 
-      in
-      let tail = 
-	try
-	  List.tl li  
-	with Failure _ -> []
-      in
-      let  _ = List.fold_left isDiff tail li 
-      in
-      li,n
-    else
-      [],0
+  (** vérifie que le callable simple a des profils différents de ceux des callables de liste et renvoit la nouvelle liste des callables en tenant compte des redéfinissions *)    
+  let diff c liste scall =
+    let atomic (acclist,check) elt =
+      if not (isDiffProf scall.osimple_params elt.osimple_params) then (
+	if elt.osimple_classe == c.class_name then
+	  (raise (AlreadyDefined(scall.osimple_pos,scall.osimple_name,Some elt.osimple_pos)))
+	else
+	  (* on peut redéfinir une méthode UNE fois dans une classe *)
+	  (if check then 
+	      (raise (AlreadyDefined (scall.osimple_pos,scall.osimple_name,Some elt.osimple_pos)));
+	   (* on doit vérifier que la redéfinition a le même type de retour *)
+	   if elt.osimple_returnType != scall.osimple_returnType then 
+	     (raise (WrongType(scall.osimple_pos,types_to_Sast scall.osimple_returnType,Some (types_to_Sast elt.osimple_returnType))));
+	   (* Pour redéfinir, on remplace simplement la méthode *)
+	   let s = { scall with osimple_n = elt.osimple_n } in
+	   ((s::acclist),true)
+	  )
+      )
+      else 
+	(elt::acclist,check)
+    in
+    let l,check = List.fold_left atomic ([],false) liste in
+    if check then
+      l
+    else 
+      (scall::l)
+    
 
-    (** Vérifie les méthodes de la classe c, ajoute les méthodes ) la map methods
-	de taille !index, en construisant le descripteur de classe à partir de desc *)
-  let checkMethods classes  d c =
-    let size = ref (List.length d)  in
-    let _ = List.for_all (isBFCall classes) c.class_methods in
-    (* ajoute les méthodes à l'environnement, et construit la liste  *)
-    let bMapandList (accMeth,accMap,desc) m = 
-      let i = !index in
+  (** Vérifie les constructeurs, et renvoit le tableau descripteur
+      @param classes la map des classes 
+      @param meths la liste des méthodes/constructeurs
+      @param c la classe courante
+      @param lastId le dernier identifiant des classes/constructeurs 
+      @param d la liste descripteur de la classe mère *)
+  let checkConst classes meths c lastId d =
+    let size = ref ((List.length d) - 1 ) in
+    let bDesc (accList,accMeths) const = 
+      (* on vérifie que les profils sont bien formés *)
+      let _ = isBFCall classes const in
+    (* on vérifie que tout les constructeurs ont le même nom *)
+      if const.call_name != c.class_name then
+	(raise (BadConst(const.call_pos,const.call_name,c.class_name)));
+      let _ = isBFCall classes const in
       let s = {
-	osimple_id = accMeth.os;
-	osimple_cid = size ;
+	osimple_pos = const.call_pos;
+	osimple_returnType = Void;
+	osimple_name = const.call_name;
+	osimple_params = const.call_params;
+	osimple_id = (incr lastId; !lastId);
+	osimple_n = (incr size; !size);
+	osimple_classe = c.class_name;
+      } 
+      in
+      let o = {
+	ocall_params = const.call_params;
+	ocall_body = const.call_body;
+      }
+      in
+      ((diff c accList s),(o::accMeths))
+    in
+    let d,meths = List.fold_left bDesc (d,meths) c.class_consts in
+    let descriptor = Array.make (!size) osimplEmpty in
+    List.iter (fun elt -> descriptor.(elt.osimple_n) <- elt) d ;
+    (d,meths,descriptor)
+    
+
+  (** Vérifie les méthodes de la classe c, et renvoit le descripteur de classe d 
+      @param classes la map de toutes les classes
+      @param meths la liste des méthodes
+      @param d le descripteur de la classe mère sous forme de CMap
+      @param lastId ref vers le dernier id des callables 
+      @param c la classe*)
+  let checkMethods classes meths d lastId c = 
+    let size = ref ((Cmap.cardinal d) - 1) in 
+    (* construit une map des méthodes *)
+    let bMap (accMap,accMeth) m =
+      let _ = isBFCall classes m in
+      let s = { 
+	osimple_pos = m.call_pos;
+	osimple_id = ( incr lastId ; !lastId);
+	osimple_n = ( incr size ; !size);
 	osimple_params = m.call_params;
+	osimple_classe = c.class_name;
 	osimple_name = m.call_name;
-      } in
-      incr size;
+	osimple_returnType = m.call_returnType ;
+      }
+      in
+      let o = {
+	ocall_params = m.call_params;
+	ocall_body = m.call_body;
+      }
+      in
       let l = 
 	try 
 	  Cmap.find m.call_name accMap
-	with Not_found -> []
+	with Not_found -> [] 
       in
-      ({om = Imap.add i m accMeth; os = accMeth.os + 1},(Cmap.add m.call_name (i::l)),(s::desc))
+      let newList = diff c l s in
+      ((Cmap.add m.call_name newList accMap),(o::accMeth))
     in
-    (* construction de la table des méthodes, du descripteur, et l'ensmble des méthodes *)
-    let methods,mMap,d = List.fold_left bMapandList (methods,Cmap.empty,d) in
-    let _ = isDiff 
-    
+    let d,meths = List.fold_left bMap (d,meths) c.class_methods in
+    (* On vérifie que toutes les méthodes définies de même nom ont des profils différents, si ce n'est pas le cas, c'est une redéfinition à traiter en conséquence *) 
+    let descriptor = Array.make (!size + 1) osimplEmpty in
+    Cmap.iter (fun n li -> 
+      List.iter (fun elt -> descriptor.(elt.osimple_n) <- elt) li ) d ;
+    (* on renvoit la nouvelle map la nouvelle liste de méthode, et le tableau *)
+    (d,meths,descriptor)
       
       
-
-  (** construit une Map des méthodes de la classe en vérifiant que tout est correct *)
-  let checkMethods  classes c =
-    (* On vérifie que toutes les méthodes ont des profils bien formés *)
-    let _ = List.for_all (isBFCall classes) c.class_methods in
-    (* on construit d'abord une Map*)
-    let bMap (acc,n) m = 
-      let m = { 
-	ocall_pos = m.call_pos;
-	ocall_id = n;
-	ocall_returnType = m.call_returnType;
-	ocall_name = m.call_name;
-	ocall_params = m.call_params;
-	ocall_body = m.call_body }
-      in
-      let l =
-	try 
-	  Cmap.find m.ocall_name acc 
-	with Not_found -> []
-      in
-      (Cmap.add m.ocall_name (m::l) acc),(n+1)
-    in
-    (* on trans-type les méthodes vers Oast *)
-    let mMap,n = List.fold_left bMap (Cmap.empty,0) c.class_methods in
-    (* on vérifie les méthodes polymorphes  *)
-    let _ = Cmap.iter (fun _ l -> 
-      let tail = 
-	try 
-	  List.tl l 
-	with Failure _ -> []
-      in
-      let _ = List.fold_left isDiff tail l 
-      in () ) mMap 
-    in
-    mMap,n
       
-
-  (** vérifie que l'héritage est sans cycle
-      vérifie que les méthodes redéfinies ont le même type de retour *)
-  let checkHerit cmap =
-    (** parcourt les parents de le classe
-	@param c la classe à partir de laquelle on parcourt
-	@param graySet L'ensemble des classes découvertes actuellement
-	@param blackSet l'ensemble des classes déjà traitées *)
-    let rec dfsVisit c graySet blackSet = 
-      if Cset.mem c.oclass_name blackSet then 
-	graySet
+  (** parcourt la map des classes, vérifie que l'héritage est sans cycle, et type les classes *)
+  let checkHerit prog classes hMap = 
+    let lastId = ref 0 in
+    let rec dfsVisit  md cd blackSet (accMap,meths) (c,pos)=
+      if Cset.mem c blackSet then
+	let cl = Cmap.find c classes in
+	(raise (Her(cl.class_pos,cl.class_name,"Cycle")))
       else
-	if Cset.mem c.oclass_name graySet then 
-	  raise (Her(c.oclass_pos,c.oclass_name,"Cycle")) 
-	else
-	  match c.oclass_extends with
-            | None -> graySet
-	    | Some ("String" , pos) -> raise (Her(pos,c.oclass_name,"Cannot herite of string"))
-	    | Some (c1name, pos) -> 
-	      let c1 = 
-		try 
-		  Cmap.find c1name cmap 
-		with Not_found -> raise (Undefined(pos,c1name))
-	      in
-	      dfsVisit c1 (Cset.add c1name graySet) blackSet
+	let cl = 
+	  try 
+	    Cmap.find c classes 
+	  with Not_found -> (raise (Undefined(pos,c))) 
+	in
+	let attrs = checkAttr classes cl in
+	let md,meths,mdescriptor = checkMethods classes meths md lastId cl in
+	let cd,meths,cdescriptor = checkConst classes meths cl lastId cd  in 
+	let cl = {
+	  oclass_pos = cl.class_pos;
+	  oclass_name = cl.class_name;
+	  oclass_extends = cl.class_extends;
+	  oclass_attrs = attrs;
+	  oclass_methodesdesc = mdescriptor;
+	  oclass_constsdesc = cdescriptor;
+	} 
+	in
+	let blackSet = Cset.add c blackSet in
+	let accMap = Cmap.add c cl accMap in
+	(* on trouve la liste des sous-classes *)
+	let liste = Cmap.find c hMap in
+	let accMap,meths = List.fold_left (dfsVisit md cd blackSet) (accMap,meths) liste  in
+	accMap,meths
     in
-    Cmap.fold (fun _ c black -> Cset.union (dfsVisit c Cset.empty black) black) cmap Cset.empty 
-
-  (** construit un arbre Oast à partir d'un arbre Past en effectuant les tests 
-      quivontbien *)
-  let typProg prog = 
-    (* vérification d'unicité des noms des classes *)
-    let classes = buildClassMap prog in
-    (* on traduit les classes en oclasses *)
-    let typClass cmap n c accmap =
-      let attrMap = checkAttr cmap c in
-      let constList,sizeConst = checkConst cmap c in
-      let mMap,sizeMeth = checkMethods cmap c in
-      Cmap.add n 
-	{ oclass_pos = c.class_pos ;
-	  oclass_name = c.class_name;
-	  oclass_extends = ( c.class_extends);
-	  oclass_attrs = attrMap;
-	  oclass_consts = constList;
-	  oclass_cn = sizeConst;
-	  oclass_methods = mMap;
-	  oclass_cm = sizeMeth;
-	} accmap 
-    in
-    let classes = Cmap.fold (typClass classes) classes Cmap.empty in
-    (* vérification de l'héritage *)
-    let _ = checkHerit classes in
-    { oclasses = classes ; oinstr = prog.instr }
+    let liste = Cmap.find "Object" hMap in
+    let classes,meths = List.fold_left (dfsVisit Cmap.empty [] Cset.empty) (Cmap.empty,[]) liste in
+    let ar = Array.make !lastId { ocall_params = []; ocall_body = Block [] } in
+    lastId := 0;
+    List.iter (fun o -> ar.(!lastId) <- o ; incr lastId) meths;
+    { omeths = ar; oclasses = classes; oinstr = prog.instr }
       
     
 end	
-
+(*
 (** typage des expressions et des instructions *)
 module  CheckInstr = struct 
     
@@ -526,7 +541,7 @@ module  CheckInstr = struct
 	  List.hd li 
 	with Failure _ -> (raise (Missing(p,cl.oclass_name,cl.oclass_name)))
       in
-      { sv = SNew({id_id = n; id_typ = (SC n)},const.ocall_id,args); sp = p ; st = types_to_Sast const.ocall_returnType }
+      { sv = SNew(n,const.ocall_id,args); sp = p ; st = (SC n) }
     | Cast(p,t,e) -> 
       let e = typExpr classes c env e in
       let t = types_to_Sast t in
@@ -627,3 +642,4 @@ module  CheckInstr = struct
 *)
 end	
 		    
+*)

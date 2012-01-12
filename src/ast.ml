@@ -26,8 +26,6 @@ module General = struct
 
 end
 
-module Int = struct type t = int let compare = compare end
-module Imap = Map.Make(Int)
 module Cmap = Map.Make(String)
 
 (** Syntaxe issue du parsage *)
@@ -135,19 +133,34 @@ module Past = struct
 
 end
 
-
 (** syntaxe issue de l'analyse et du typage des classes *) 
 module Oast = struct 
   include Past 
       
   (** Les méthodes/constructeurs dans le descripteur *)
   type oSimple = {
+    osimple_pos : pos ;
     osimple_id : int ;
     osimple_classe : string ;
     osimple_n : int;
     osimple_params : variable list;
     osimple_name : string;
+    osimple_returnType : types;
   }
+      
+  let osimplEmpty =  {
+    osimple_pos = { 
+    file = "";
+    line = 0;
+    fChar = 0;
+    lChar = 0;
+    } ;
+    osimple_id = 0;
+    osimple_classe ="";
+    osimple_n = 0;
+    osimple_params = [];
+    osimple_name = "";
+    osimple_returnType = Void }
       
   type ocallable = { 
     ocall_params : variable list ;
@@ -164,16 +177,14 @@ module Oast = struct
     (** Les attributs, sous forme d'une Map qui à chacun associe une variable *)
     oclass_attrs : variable Cmap.t;
     (** descripteur de classe *)
-    oclass_methodesdesc : oSimple list;
+    oclass_methodesdesc : oSimple array;
     (** descripteur des constructeur *)
-    oclass_constsdesc : oSimple list;
-    (** nombre de const/méthodes définis dans la classe courante *)
-    oclass_nconst : int;
-    oclass_nmeth : int ;
-    
+    oclass_constsdesc : oSimple array;    
   }
 
   type oprog = {
+    (** tableau des méthodes/map *)
+    omeths : ocallable array;
     (** Map des classes *)
     oclasses : oclasse Cmap.t ;
     (** liste des instructions dans main*)
