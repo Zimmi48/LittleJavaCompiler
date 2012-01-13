@@ -25,7 +25,7 @@ sub chk_exit {
     }
 }
 
-chk_exit('tests/syntax/bad', '-type-only', 1); # modifié pour passer avec les valeurs gauche
+chk_exit('tests/syntax/bad', '-parse-only', 1);
 chk_exit('tests/typing/bad', '-type-only', 1);
 chk_exit('tests/typing/good', '-type-only', 0);
 chk_exit('tests/exec-fail', '', 0);

@@ -163,8 +163,20 @@ expr:
 | NULL           { Null (position $startpos $endpos) }
 | NOT e = expr   { Not (position $startpos $endpos, e) }
 | MINUS e = expr %prec uminus { UMinus (position $startpos $endpos, e) }
-| op = opPrefPost e = expr    { Pref (position $startpos $endpos , op , e) }
-| e = expr op = opPrefPost    { Post (position $startpos $endpos , op , e) }
+| op = opPrefPost e = expr
+    { match e with
+      | Getval (_,_) -> Pref (position $startpos $endpos , op , e)
+      | _ ->
+        raise (TypeClass.Exceptions.NotALeftValue
+          (position $startpos $endpos) )
+    }
+| e = expr op = opPrefPost
+    { match e with
+      | Getval (_,_) -> Post (position $startpos $endpos , op , e)
+      | _ ->
+        raise (TypeClass.Exceptions.NotALeftValue
+          (position $startpos $endpos) )
+    }
 | e1 = expr op = opInfix e2 = expr
     { Binaire (position $startpos $endpos , op , e1 , e2) }
 | LP t = typNatif RP f = expr %prec cast
@@ -173,7 +185,13 @@ expr:
     { match e with
       | Getval (_ , Var id) -> Cast (position $startpos $endpos , C id , f)
       | _ -> raise (PasUnType (position $startpos $endpos)) }
-| e1 = expr EQ e2 = expr { Assign (position $startpos $endpos , e1 , e2) }
+| e1 = expr EQ e2 = expr
+    { match e1 with
+      | Getval (_,_) -> Assign (position $startpos $endpos , e1 , e2)
+      | _ ->
+        raise (TypeClass.Exceptions.NotALeftValue
+          (position $startpos $endpos) )
+    }
 | e = expr DOT id = IDENT LP l = separated_list(COMMA, expr) RP
        { Call (position $startpos $endpos , Some e , id , l) }
 | id = IDENT LP l = separated_list(COMMA, expr) RP

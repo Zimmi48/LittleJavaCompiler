@@ -1,4 +1,4 @@
-CMO=ast.cmo lexer.cmo parser.cmo typeClass.cmo mips.cmo compile.cmo main.cmo
+CMO=ast.cmo typeClass.cmo lexer.cmo parser.cmo mips.cmo compile.cmo main.cmo
 GENERATED=lexer.ml parser.ml parser.mli
 BIN=pjava
 FLAGS=
@@ -28,7 +28,7 @@ $(BIN):$(CMO)
 clean:
 	rm -f *.cm[io] *.o *~ *.annot *.conflicts *.output *.automaton $(BIN) $(GENERATED)
 
-.depend depend:ast.cmo $(GENERATED)
+.depend depend:ast.cmo typeClass.cmo $(GENERATED)
 	rm -f .depend
 	ocamldep *.ml *.mli > .depend
 
