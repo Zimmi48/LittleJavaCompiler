@@ -86,8 +86,7 @@ module ClassAnalysis = struct
 	)
 	in
 	((Cmap.add c.class_name c map),hmap)) in
-    let hmap = Cmap.add "String" [] Cmap.empty in
-    let hmap = Cmap.add "Object" [("String",emptyPos)] hmap in      
+    let hmap = Cmap.add "Object" [] Cmap.empty in
     List.fold_left addClass (Cmap.empty,hmap) prog.classes
    
   (* ZAST TO OAST *)
@@ -279,7 +278,7 @@ module ClassAnalysis = struct
 	let liste = Cmap.find c hMap in
 	let accMap,meths = List.fold_left (dfsVisit md cd blackSet) (accMap,meths) liste  in
 	accMap,meths
-    in
+    in     
     let liste = Cmap.find "Object" hMap in
     let classes,meths = List.fold_left (dfsVisit Cmap.empty [] Cset.empty) (Cmap.empty,[]) liste in
     let ar = Array.make !lastId { ocall_params = []; ocall_body = Block [] } in

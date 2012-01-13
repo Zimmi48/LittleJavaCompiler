@@ -4,6 +4,7 @@
 open Format
 open Lexing
 open TypeClass 
+open Exceptions
 
 (* Option de compilation, pour s'arrêter à l'issue du parser *)
 let parse_only = ref false
@@ -121,18 +122,18 @@ let () =
       localisationBis { Ast.Past.file = "" ; line = 0 ; fChar = 0 ; lChar = 0 } ; (* position non déterminée *)
       eprintf "Erreur dans l'analyse lexicale : commentaire non terminé@.";
       exit 1
-    | TypeClass.Exceptions.AlreadyDefined (pos1, id, pos2) ->
+    | AlreadyDefined (pos1, id, pos2) ->
       localisationBis pos1 ;
+      eprintf "Erreur : identifiant déjà défini@.";
       begin match pos2 with | None -> () | Some p -> localisationBis p end ;
-      eprintf "Erreur : cette classe est définie plusieurs fois@.";
-    | TypeClass.Exceptions.Undefined (pos, id) ->
+    | Undefined (pos, id) ->
       localisationBis pos ;
-      eprintf "Erreur : cet identifiant n'a jamais été défini@."
-    | TypeClass.Exceptions.Her (pos, id, s) ->
+      eprintf "Erreur : %s cet identifiant n'a jamais été défini@." id
+    | Her (pos, id, s) ->
       localisationBis pos ;
-      eprintf "Erreur d'héritage : %s@." s ;
+      eprintf "Erreur d'héritage : %s %s@." id s ;
     (* Les types sont pris ici dans Sast *)
-    | TypeClass.Exceptions.WrongType (pos, ty, sty) ->
+    | WrongType (pos, ty, sty) ->
       localisationBis pos ;
       eprintf "Erreur : ceci a le type %s" (affichePType ty) ;
       begin
@@ -141,9 +142,25 @@ let () =
         | Some ty ->
           eprintf "mais le type attendu était %s@." (affichePType ty) ;
       end
-    | TypeClass.Exceptions.NotALeftValue pos ->
+    | Duplicated(pos,id) ->
+      localisationBis pos ;
+      eprintf "Erreur : plusieurs arguments portent le même nom@";
+    | Missing(pos,classe,id) ->
+      localisationBis pos ;
+      eprintf "Erreur : la classe %s n'a pas de champ %s de profil compatible@" classe id;
+    | NotALeftValue pos ->
       localisationBis pos ;
       eprintf "Erreur : Ceci n'est pas une valeur gauche@." ;
+    | BadConst(pos,const, classe) ->
+      localisationBis pos ;
+      eprintf "Erreur : le constructeur %s n'a pas le même nom que la classe %s@" const classe;
+    | Ambiguous(pos,name) ->
+      localisationBis pos ;
+      eprintf "Erreur : ambiguité sur le choix de la méthode/constructeur %s@" name;
+    | EReturn(pos,pos2) ->
+      localisationBis pos ;
+      eprintf "Erreur : pas de return dans cette branche :@";
+      localisationBis pos2 ;
     | Failure s ->
       eprintf "Erreur du compilateur : %s@." s ;
       exit 2 ;
