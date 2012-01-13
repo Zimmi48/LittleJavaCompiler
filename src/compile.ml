@@ -147,7 +147,7 @@ let compile_program p ofile =
                 begin
                   if e1.st = SInt & e2.st = SInt then
                     begin
-                      if op = Div then
+                      if op = Div or op = Mod then
                         function acc ->
                           Beqz (V0, "throw_division_by_zero_failure")
                           :: acc
@@ -449,9 +449,9 @@ let compile_program p ofile =
       Sw (FP, Areg(0, SP)) :: (* sauvegarde FP *)
       Arith (Sub, FP, SP, Oimm 4) :: (* initialise FP *)
       Sw (RA, Areg(0, FP)) :: (* sauvegarde RA *)
-      Arith (Add, SP, FP, Oimm frame_size) :: (* Alloue la frame *)
+      Arith (Add, SP, FP, Oimm (frame_size - 4)) :: (* Alloue la frame *)
       body @
-      [Arith (Add, SP, SP, Oimm (-frame_size)); (* désalloue la frame *)
+      [Arith (Add, SP, SP, Oimm (-frame_size + 4)); (* désalloue la frame *)
        Lw (RA, Areg(0, SP)); (* récupère la valeur de RA *)
        Arith (Add, SP, SP, Oimm 4);
        Lw (FP, Areg(0, SP)); (* et celle de FP de l'appelant *)
