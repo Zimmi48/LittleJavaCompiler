@@ -112,8 +112,8 @@ module ClassAnalysis = struct
       
   (** vérfie l'unicité des champs et que leurs types soient bien formés
       renvoit la map des attributs *)
-  let checkAttr classes c = 
-    let aux accmap  attr = 
+  let checkAttr classes c acc =     
+    let aux (accmap,acclist)  attr = 
       let name = attr.v_name in
       if Cmap.mem name accmap then 
 	let a = Cmap.find name accmap in
@@ -122,9 +122,9 @@ module ClassAnalysis = struct
 	if not (isBF classes attr.v_type) then 
 	  raise (WrongType( attr.v_pos,types_to_Sast attr.v_type,None))
 	else
-	  Cmap.add name attr accmap
+	  (Cmap.add name attr accmap),(name::acclist)
     in
-    List.fold_left aux Cmap.empty c.class_attrs 
+    List.fold_left aux (acc,[]) c.class_attrs
       
   (** vérifie qu'un profil prend bien une liste d'arguments de noms différents *)
   let isBFCall classes call = 
@@ -152,7 +152,7 @@ module ClassAnalysis = struct
     with  Invalid_argument _ -> true
       
   (** vérifie que le callable simple a des profils différents de ceux des callables de liste et renvoit la nouvelle liste des callables en tenant compte des redéfinissions *)    
-  let diff c liste scall =
+  let diff c liste scall size =
     let atomic (acclist,check) elt =
       if not (isDiffProf scall.osimple_params elt.osimple_params) then (
 	if elt.osimple_classe = c.class_name then
@@ -166,6 +166,7 @@ module ClassAnalysis = struct
 	     (raise (WrongType(scall.osimple_pos,types_to_Sast scall.osimple_returnType,Some (types_to_Sast elt.osimple_returnType))));
 	   (* Pour redéfinir, on remplace simplement la méthode *)
 	   let s = { scall with osimple_n = elt.osimple_n } in
+	   decr size;
 	   ((s::acclist),true)
 	  )
       )
@@ -212,10 +213,10 @@ module ClassAnalysis = struct
 	ocall_body = const.call_body;
       }
       in
-      ((diff c accList s),(o::accMeths))
+      ((diff c accList s size),(o::accMeths))
     in
     let d,meths = List.fold_left bDesc (d,meths) c.class_consts in
-    let descriptor = Array.make (!size) osimplEmpty in
+    let descriptor = Array.make !size osimplEmpty in
     List.iter (fun elt -> descriptor.(elt.osimple_n) <- elt) d ;
     (d,meths,descriptor)
     
@@ -253,7 +254,7 @@ module ClassAnalysis = struct
 	  Cmap.find m.call_name accMap
 	with Not_found -> [] 
       in
-      let newList = diff c l s in
+      let newList = diff c l s size in
       ((Cmap.add m.call_name newList accMap),(o::accMeth))
     in
     let d,meths = List.fold_left bMap (d,meths) c.class_methods in
@@ -270,7 +271,7 @@ module ClassAnalysis = struct
   let checkHerit prog=
     let classes,hMap = buildClassMap prog in
     let lastId = ref 0 in
-    let rec dfsVisit  md cd (accMap,meths,blackSet) (c,pos)=
+    let rec dfsVisit  md cd attrMap (accMap,meths,blackSet) (c,pos)=
       if Cset.mem c blackSet then (
 	let cl = Cmap.find c classes in
 	(raise (Her(cl.class_pos,cl.class_name,"Cycle"))) )
@@ -280,7 +281,7 @@ module ClassAnalysis = struct
 	    Cmap.find c classes 
 	  with Not_found -> (raise (Undefined(pos,c))) 
 	in
-	let attrs = checkAttr classes cl in
+	let attrs,attrlist = checkAttr classes cl attrMap in
 	let md,meths,mdescriptor = checkMethods classes meths md lastId cl in
 	let cd,meths,cdescriptor = checkConst classes meths cl lastId cd  in 
 	let ext = match cl.class_extends with
@@ -293,6 +294,7 @@ module ClassAnalysis = struct
 	  oclass_name = cl.class_name;
 	  oclass_extends = ext ;
 	  oclass_attrs = attrs;
+	  oclass_selfattrs = attrlist;
 	  oclass_methodesdesc = mdescriptor;
 	  oclass_constsdesc = cdescriptor;
 	} 
@@ -305,13 +307,13 @@ module ClassAnalysis = struct
 	    Cmap.find c hMap 
 	  with Not_found -> [] 
 	in
-	let accMap,meths,blackSet = List.fold_left (dfsVisit md cd) (accMap,meths,blackSet) liste  in
+	let accMap,meths,blackSet = List.fold_left (dfsVisit md cd attrs) (accMap,meths,blackSet) liste  in
 	accMap,meths,blackSet
-    in     
+    in
     let liste = Cmap.find "Object" hMap in
-    if (liste = []) && ( not (Cmap.is_empty hMap)) then 
+    if (liste = []) && ((Cmap.cardinal hMap) > 1) then 
       (raise (Her(emptyPos,"","Cycle")));
-    let classes,meths,_ = List.fold_left (dfsVisit Cmap.empty []) (Cmap.empty,[],Cset.empty) liste in
+    let classes,meths,_ = List.fold_left (dfsVisit Cmap.empty [] Cmap.empty) (Cmap.empty,[],Cset.empty) liste in
     let ar = Array.make !lastId { ocall_params = []; ocall_body = Block [] } in
     decr lastId;
     List.iter (fun o -> ar.(!lastId) <- o ; decr lastId) meths;
@@ -568,12 +570,15 @@ module  CheckInstr = struct
 	      |SC n -> n
 	      | t -> (raise (WrongType(e.sp,e.st,(Some t))))
 	    in
-	    let cl = 
-	      try
-		Cmap.find name classes
-	      with Not_found -> (raise (Undefined (e.sp,name)))
-	    in
-	    e,cl
+	    if name = "String" then 
+	      e,c
+	    else (
+	      let cl = 
+		try
+		  Cmap.find name classes
+		with Not_found -> (raise (Undefined (e.sp,name)))
+	      in
+	      e,cl)
 	  end
 	| None ->  
 	  ({ sp = p; st = SC c.oclass_name; sv = SGetval(SVar({id_id = "this"; id_typ = SC  c.oclass_name}))}),c
@@ -617,7 +622,7 @@ module  CheckInstr = struct
 	    None 
 	  else
 	    (raise (Missing(ep,ec,en))))
-      in
+      in	                
       { sv = SNew(n,constId,args); sp = p ; st = (SC n) }
     | Cast(p,t,e) -> 
       let e = typExpr classes c env e in
@@ -739,11 +744,12 @@ module  CheckInstr = struct
       }
     in
     let atomic n c accMap = 
-      let env,attrMap = Cmap.fold 
-	(fun n v (e,a) ->
-	  (Cmap.add n (types_to_Sast v.v_type) e),(Cmap.add n { id_id = n; id_typ = types_to_Sast v.v_type} a)
-	) c.oclass_attrs (Cmap.empty,Cmap.empty) in
-      let env = Cmap.add "this" (SC c.oclass_name) env in
+      let attrMap = List.fold_left 
+	(fun a n ->
+	  let v = Cmap.find n c.oclass_attrs in
+	  (Cmap.add n { id_id = n; id_typ = types_to_Sast v.v_type} a)
+	)  (Cmap.empty) c.oclass_selfattrs in
+      let env = Cmap.add "this" (SC c.oclass_name) Cmap.empty in
       (* typage d'un callable *)
       let tCall call returnType pos =
 	let lenv,params = List.fold_left (fun (accEnv,accList) elt ->
@@ -760,14 +766,15 @@ module  CheckInstr = struct
 	 scall_body = instr; }
       in
       let mDescriptor = Array.make (Array.length c.oclass_methodesdesc) 0 in
-      Array.iter (fun elt -> 
+      Array.iter (fun elt ->
 	mDescriptor.(elt.osimple_n) <- elt.osimple_id;
 	let call = prog.omeths.(elt.osimple_id) in
 	let call = tCall call (types_to_Sast elt.osimple_returnType) elt.osimple_pos in
 	meths.(elt.osimple_id) <- call;
       ) c.oclass_methodesdesc ;
+
       let cDescriptor = Array.make (Array.length c.oclass_constsdesc) 0 in
-      Array.iter (fun elt -> 
+      Array.iter (fun elt ->
 	cDescriptor.(elt.osimple_n) <- elt.osimple_id;
 	let call = prog.omeths.(elt.osimple_id) in
 	let call = tCall call SVoid elt.osimple_pos in
@@ -787,13 +794,17 @@ module  CheckInstr = struct
       in
       Cmap.add n nClass accMap
     in
-    let classes = Cmap.fold atomic prog.oclasses Cmap.empty in
+    
+ (*   Array.iter (fun elt -> List.iter (fun v -> Printf.printf "%s," v.v_name;) elt.ocall_params; Printf.printf "\n";) prog.omeths; *)
+
+    let classes = Cmap.fold atomic  prog.oclasses Cmap.empty in
     (* on crée une classe artificielle *)
     let classMain = {
       oclass_pos = ClassAnalysis.emptyPos;
       oclass_name = "Main";
       oclass_extends = None;
       oclass_attrs = Cmap.empty;
+       oclass_selfattrs = [];
       oclass_methodesdesc = [||];
       oclass_constsdesc = [||];
     } in

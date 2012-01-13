@@ -99,40 +99,40 @@ let () =
 	(* Erreur lexicale. On récupère sa position absolue et 
 	   on la convertit en numéro de ligne *)
 	localisation (Lexing.lexeme_start_p buf);
-	eprintf "Erreur dans l'analyse lexicale: %c\n." c;
+	eprintf "Erreur dans l'analyse lexicale: %c\n" c;
 	exit 1
     | Parser.Error -> 
 	(* Erreur syntaxique. On récupère sa position absolue et on la 
 	   convertit en numéro de ligne *)
       localisation (Lexing.lexeme_start_p buf);
-      eprintf "Erreur dans l'analyse syntaxique\n.";
+      eprintf "Erreur dans l'analyse syntaxique\n";
       exit 1
     | Ast.Past.ClassMain pos ->
       (* Erreur syntaxique spéciale *)
       localisationBis pos ;
-      eprintf "Erreur dans l'analyse syntaxique.Mauvaise définition de class Main\n.";
+      eprintf "Erreur dans l'analyse syntaxique.Mauvaise définition de class Main\n";
       exit 1
     | Ast.Past.PasUnType pos ->
       (* Erreur syntaxique spéciale *)
       localisationBis pos ;
-      eprintf "Erreur dans l'analyse syntaxique. Ceci n'est pas un type\n.";
+      eprintf "Erreur dans l'analyse syntaxique. Ceci n'est pas un type\n";
       exit 1
     | Ast.Past.CommentaireNonTermine ->
       localisationBis { Ast.Past.file = "" ; line = 0 ; fChar = 0 ; lChar = 0 } ; (* position non déterminée *)
-      eprintf "Erreur dans l'analyse lexicale : commentaire non terminé\n.";
+      eprintf "Erreur dans l'analyse lexicale : commentaire non terminé\n";
       exit 1
     | AlreadyDefined (pos1, id, pos2) ->
       localisationBis pos1 ;
-      eprintf "Erreur : identifiant déjà défini\n.";
+      eprintf "Erreur : identifiant déjà défini\n";
       begin match pos2 with | None -> () | Some p -> localisationBis p end ;
       exit 1
     | Undefined (pos, id) ->
       localisationBis pos ;
-      eprintf "Erreur : %s cet identifiant n'a jamais été défini\n." id ;
+      eprintf "Erreur : %s cet identifiant n'a jamais été défini\n" id ;
       exit 1
     | Her (pos, id, s) ->
       localisationBis pos ;
-      eprintf "Erreur d'héritage : %s %s \n." id s ;
+      eprintf "Erreur d'héritage : %s %s \n" id s ;
       exit 1
     (* Les types sont pris ici dans Sast *)
     | WrongType (pos, ty, sty) ->
@@ -140,9 +140,9 @@ let () =
       eprintf "Erreur : ceci a le type %s" (affichePType ty) ;
       begin
       match sty with
-        | None -> eprintf "qui n'est pas le type compatible\n."
+        | None -> eprintf "qui n'est pas le type compatible\n"
         | Some ty ->
-          eprintf " mais le type attendu était %s \n." (affichePType ty) ;
+          eprintf " mais le type attendu était %s \n" (affichePType ty) ;
       end;
       exit 1
     | Duplicated(pos,id) ->
@@ -155,7 +155,7 @@ let () =
       exit 1
     | NotALeftValue pos ->
       localisationBis pos ;
-      eprintf "Erreur : Ceci n'est pas une valeur gauche\n." ;
+      eprintf "Erreur : Ceci n'est pas une valeur gauche\n" ;
       exit 1
     | BadConst(pos,const, classe) ->
       localisationBis pos ;
@@ -170,9 +170,8 @@ let () =
       eprintf "Erreur : pas de return dans cette branche :\n";
       localisationBis pos2 ;
       exit 1
+	(*
     | Failure s ->
-      eprintf "Erreur du compilateur : %s \n." s ;
+      eprintf "Erreur du compilateur : %s \n" s ;
       exit 2 ;
-  
-
-
+	*)

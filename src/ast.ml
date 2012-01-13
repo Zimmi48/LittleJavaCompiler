@@ -176,6 +176,8 @@ module Oast = struct
     oclass_extends : (ident*pos) option;
     (** Les attributs, sous forme d'une Map qui à chacun associe une variable *)
     oclass_attrs : variable Cmap.t;
+    (** liste des attribus de la classe courante *)
+    oclass_selfattrs : string list;
     (** descripteur de classe *)
     oclass_methodesdesc : oSimple array;
     (** descripteur des constructeur *)
