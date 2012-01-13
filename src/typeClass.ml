@@ -39,6 +39,9 @@ module Exceptions = struct
   (** Le constructeur n'as pas le bon nom  nom du const * nom de la classe*)
   exception BadConst of pos * string * string 
 
+  (** Deux constructeurs/méthodes conviennent *)
+  exception Ambiguous of pos * string
+
 
 end
 
@@ -283,7 +286,7 @@ module ClassAnalysis = struct
       
     
 end	
-(*
+
 (** typage des expressions et des instructions *)
 module  CheckInstr = struct 
     
@@ -320,8 +323,8 @@ module  CheckInstr = struct
 
   (** compare deux const/méthodes, relation d'ordre supposée totale *)
   let compCall classes c1 c2 = 
-    let p1 = List.map (fun v -> types_to_Sast v.v_type) c1.ocall_params in
-    let p2 = List.map (fun v -> types_to_Sast v.v_type) c2.ocall_params in
+    let p1 = List.map (fun v -> types_to_Sast v.v_type) c1.osimple_params in
+    let p2 = List.map (fun v -> types_to_Sast v.v_type) c2.osimple_params in
     if isSubProf classes p1 p2 then
       (if (isSubProf classes p2 p1) then
 	  0 
@@ -330,41 +333,52 @@ module  CheckInstr = struct
     else
       1
     
-  (** construit l'ensemble meth(C,m,prof) sous forme de liste  
-      en cherchant récursivement dans les sur-classes *)
-  let rec findMeth classes c m args acc= 
-    let li = Cmap.find m c.oclass_methods in
-    (* on choisit seulement les méthodes qui vérifient la relation *)
-    let li = List.fold_left (fun acclist elt ->
-      if (isSubProf classes args (List.map (fun v -> types_to_Sast v.v_type) elt.ocall_params))then
-	elt::acclist 
-      else
-	acclist )
-      [] li 
+  (** construit l'ensemble meth(C,m,prof) sous forme de liste et renvoit le minimum selon la relation de sous typage*)
+  let rec findCall classes cl p desc m args =
+    let mList = Array.fold_left (fun accList elt -> 
+      if elt.osimple_name = m then (
+	if (isSubProf classes args (List.map (fun v -> types_to_Sast v.v_type) elt.osimple_params)) then 
+	  elt::accList
+	else
+	  accList )
+      else 
+	accList) [] desc in
+    (* liste triée selon la relation d'ordre *)
+    let mList = List.stable_sort (compCall classes) mList in
+    let meth = 
+      try
+	List.hd mList 
+      with Failure _ -> (raise (Missing(p,cl.oclass_name,m)))
     in
-    (* on concatène les méthodes qui correspondent *)
-    let acc = List.rev_append li acc in 
-    match c.oclass_extends with
-      | Some (name,_) -> 
-	let cl = Cmap.find name classes in
-	findMeth classes cl m args acc
-      | None -> acc
- 
+    (* on vérifie qu'il n'y a qu'un seul minimum *)
+    (try 
+       let elt = List.hd mList  in
+       if ( compCall classes meth elt) = 0 then
+	 (raise (Ambiguous(p,m)))
+     with Failure _ ->  ()  );
+    meth
 	
   type leftValue = { lv : svars; lt:  stypes }
        
   (** Type les varleurs gauches *)
   let rec typLeft classes c env p = function
     |Var(id) -> 
-      let t =
-	try 
-	  Cmap.find id env 
-	with Not_found ->
+      begin
+      try 
+	let t = Cmap.find id env in
+	{lv = SVar({id_id = id; id_typ = t}); lt = t}
+	with Not_found -> (
 	  try 
-	   types_to_Sast (Cmap.find id c.oclass_attrs).v_type
-	  with Not_found -> (raise (Undefined(p,id)))
-      in
-      { lv = SVar({id_id = id; id_typ = t}) ; lt = t }
+	    (* si la variable est un attribut de la classe courante, 
+	       on transtype l'expression vers SAttr, 
+	       en utilisant le mot clé "this" *)
+	    let t = types_to_Sast (Cmap.find id c.oclass_attrs).v_type in
+	    { lv = SAttr({ sv = SGetval(SVar({id_id ="this"; id_typ = SC c.oclass_name}));
+			   sp = p; 
+			   st = SC c.oclass_name },
+			 {id_id = id; id_typ = t}) ; lt = t}
+	  with Not_found -> (raise (Undefined(p,id))) )
+      end
     | Attr(e,id) ->
       let  exp = typExpr classes c env e in
       let cl =
@@ -381,6 +395,7 @@ module  CheckInstr = struct
 	with Not_found -> (raise (Missing(p,cl.oclass_name,id)))
       in
       { lv = SAttr(exp,{id_id = id; id_typ = types_to_Sast attr.v_type}); lt =  types_to_Sast attr.v_type }
+
 
   (** type les expressions *)
   and typExpr classes c env = function
@@ -502,8 +517,8 @@ module  CheckInstr = struct
 	  ({ sp = p; st = SC c.oclass_name; sv = SGetval(SVar({id_id = "this"; id_typ = SC  c.oclass_name}))}),c
       in
       (* Il faut traiter String et sa méthode equals différemment *)
-      if (expr.st = (SC "String")) && ( m = "equals") then (
-	if (List.length li) = 1 then
+      if (expr.st = (SC "String")) then (
+	if (List.length li) = 1 && ( m = "equals") then
 	  let e1 = typExpr classes c env (List.hd li) in
 	  { sv = SCall(expr,0,[e1]); st = SBool; sp = p }
 	else
@@ -512,16 +527,10 @@ module  CheckInstr = struct
       else
 	(
 	  let li = List.map (typExpr classes c env) li in
-	  let mList = findMeth classes cl m (List.map (fun elt -> elt.st) li) [] in
-	  (* On doit prendre en compte les redéfinition en prenant la méthode la plus basse *)
-	  let mList = List.rev mList in
-	  let mList = List.stable_sort (compCall classes) mList in
-	  let meth = 
-	    try
-	      List.hd mList 
-	    with Failure _ -> (raise (Missing(p,cl.oclass_name,m)))
+	  let meth = findCall classes cl p cl.oclass_methodesdesc m 
+	    (List.map (fun elt -> elt.st) li) 
 	  in
-	  { sv = SCall(expr,meth.ocall_id,li); sp = p; st = types_to_Sast meth.ocall_returnType }
+	  { sv = SCall(expr,meth.osimple_n,li); sp = p; st = types_to_Sast meth.osimple_returnType }
 	)
     | New(p,n,args) ->
       let cl = 
@@ -530,18 +539,20 @@ module  CheckInstr = struct
 	with Not_found -> (raise (Undefined(p,n)))
       in
       let args = List.map (typExpr classes c env) args in
-      let li = List.fold_left (fun acclist elt ->
-	if (isSubProf classes (List.map (fun e -> e.st) args)  (List.map (fun v -> types_to_Sast v.v_type) elt.ocall_params)) then
-	  (elt::acclist)
-	else
-	  acclist)
-	[] cl.oclass_consts  in
-      let const = 
-	try
-	  List.hd li 
-	with Failure _ -> (raise (Missing(p,cl.oclass_name,cl.oclass_name)))
+      (* S'il n'y a pas de constructeur correspondant ET aucun argument
+	 on considère qu'on utilise aucun constructeur *)
+      let constId =
+	try 
+	  let const = findCall classes cl p cl.oclass_constsdesc n 
+	    (List.map (fun elt -> elt.st)args) in
+	  Some const.osimple_n 
+	with Missing(ep,ec,en) -> (
+	  if args = [] then 
+	    None 
+	  else
+	    (raise (Missing(ep,ec,en))))
       in
-      { sv = SNew(n,const.ocall_id,args); sp = p ; st = (SC n) }
+      { sv = SNew(n,constId,args); sp = p ; st = (SC n) }
     | Cast(p,t,e) -> 
       let e = typExpr classes c env e in
       let t = types_to_Sast t in
@@ -640,6 +651,4 @@ module  CheckInstr = struct
       let tCall call =
 	let env =
 *)
-end	
-		    
-*)
+end
