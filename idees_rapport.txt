@@ -2,7 +2,6 @@ Avec la méthode adoptée pour System.out.print, cette écriture est
 obligatoire. On n'a pas le droit à ((((System)))).out.print. On a jugé que
 ce n'était pas grave, vu que de toute façon cette "méthode statique" est
 parachutée.
-Noter que nous interdisons new String().
 Les erreurs dues aux valeurs gauches ne sont levées qu'au typage ce qui
 peut faire croire que des tests de syntax/bad sont acceptés alors qu'ils
 sont rejetés dans la phase suivante.

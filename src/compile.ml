@@ -237,7 +237,15 @@ let compile_program p ofile =
           | _ -> failwith "Typage de instanceof incorrect" )
     | SNew (name, constr, args) ->
       if name = "String" then
-        failwith "Il est interdit d'instancier String : typage incorrect"
+        (* alloc dynamique *)
+        Li (V0, 9)
+        :: Li (A0, 8)
+        :: Syscall
+        :: La (T0, "descr_general_String")
+        :: Sw (T0, Areg(0, V0) )
+        :: Li (T0, 0)
+        :: Sw (T0, Areg(4, V0) )
+        :: acc
       else begin
         try
           (* alloc dynamique *)
