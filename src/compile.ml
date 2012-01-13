@@ -127,8 +127,6 @@ let compile_program p ofile =
           let label_fin = "expr_bool_fin_" ^ soi !expr_bool_nb in
           incr expr_bool_nb ;
             Bnez (V0, label_fin)
-            :: Sw (V0, Areg (0, SP)) (* et stocke sur la pile *)
-            :: Arith (Sub, SP, SP, Oimm 4)
             :: compile_expr e2 env ( (* compile e2 et laisse dans V0 *)
               Label label_fin (* la valeur de retour se trouve déjà dans V0 *)
               :: acc )
@@ -136,8 +134,6 @@ let compile_program p ofile =
           let label_fin = "expr_bool_fin_" ^ soi !expr_bool_nb in
           incr expr_bool_nb ;
             Beqz (V0, label_fin)
-            :: Sw (V0, Areg (0, SP)) (* et stocke sur la pile *)
-            :: Arith (Sub, SP, SP, Oimm 4)
             :: compile_expr e2 env ( (* compile e2 et laisse dans V0 *)
               Label label_fin (* la valeur de retour se trouve déjà dans V0 *)
               :: acc )
@@ -145,11 +141,11 @@ let compile_program p ofile =
           Sw (V0, Areg (0, SP)) :: (* et stocke sur la pile *)
             Arith (Sub, SP, SP, Oimm 4) ::
             compile_expr e2 env ( (* compile e2 et laisse dans V0 *)
-              Arith (Add, SP, SP, Oimm 4) ::
-                Lw (T0, Areg (0, SP)) :: (* cherche la valeur de e1 *)
                 begin
                   if e1.st = SInt & e2.st = SInt then
-                    Arith (
+                    Arith (Add, SP, SP, Oimm 4)
+                    :: Lw (T0, Areg (0, SP)) (* cherche la valeur de e1 *)
+                    :: Arith (
                       begin
                         match op with
                           | Eq -> Mips.Eq | Neq -> Mips.Neq
@@ -164,21 +160,29 @@ let compile_program p ofile =
                         , V0, T0, Oreg V0 )
                     :: acc
                   else if e1.st = SBool then (* nécessairement e2.st = SBool *)
-                    Arith (Mips.Neq, V0, V0, Oimm 0) ::
-                      (* on renormalise : V0 != 0 devient 1 ; 0 reste 0 afin
-                         que la comparaison Eq ou Neq ait lieu correctement *)
-                      Arith (Mips.Neq, T0, T0, Oimm 0) ::
-                      Arith (
-                        begin
-                          match op with
-                            | Eq -> Mips.Eq | Neq -> Mips.Neq
-                            | _ -> failwith "Typage mal fait ou erreur 42"
-                        end
-                          , V0, T0, Oreg V0 )
+                    Arith (Add, SP, SP, Oimm 4)
+                    :: Lw (T0, Areg (0, SP)) (* cherche la valeur de e1 *)
+                    :: Arith (Mips.Neq, V0, V0, Oimm 0)
+                    (* on renormalise : V0 != 0 devient 1 ; 0 reste 0 afin
+                       que la comparaison Eq ou Neq ait lieu correctement *)
+                    :: Arith (Mips.Neq, T0, T0, Oimm 0)
+                    :: Arith (
+                      begin
+                        match op with
+                          | Eq -> Mips.Eq | Neq -> Mips.Neq
+                          | _ -> failwith "Typage mal fait ou erreur 42"
+                      end
+                        , V0, T0, Oreg V0 )
+                    :: acc
+                  else if e1.st = SC "String" & (op = Eq or op = Neq) then
+                    Sw (V0, Areg (0, SP)) (* stocke e2 sur la pile *)
+                    :: Arith (Sub, SP, SP, Oimm 4)
+                    :: Jal "String_equals"
+                    :: Arith (Add, SP, SP, Oimm 8) (* libère la pile *)
                     :: acc
                   else failwith "Not implemented"
-                (* rajouter les comparaisons généralisées et la concaténation 
-                 de chaînes *)
+                (* rajouter les comparaisons entre objets != string
+                   et la concaténation de chaînes *)
                 end ) )
     | SCast (typ, e) ->
       compile_expr e env (
