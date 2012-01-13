@@ -39,6 +39,7 @@ let compile_program p ofile =
   let condition_nb = ref 0 in
   let for_nb = ref 0 in
   let expr_bool_nb = ref 0 in
+  let print_preparation_nb = ref 0 in
   let soi = string_of_int in
   let int_of_bool = function true -> 1 | false -> 0 in
   let data = ref [
@@ -289,8 +290,9 @@ let compile_program p ofile =
         with _ -> failwith "Compilation de New"
       end
     | SPrint e -> (* prend en argument un objet de type String *)
+      let label = "print_preparation_" ^ soi !print_preparation_nb in
       compile_expr e env (
-        Bnez (V0, "print_preparation")
+        Bnez (V0, label)
         (* sinon la chaîne pointe sur NULL, on lève une erreur *)
         :: La (A0, "print_failure") (* on affiche l'erreur *)
         :: Jal "print"
@@ -298,7 +300,7 @@ let compile_program p ofile =
         :: Li (A0, 1)
         :: Syscall
           
-        :: Label "print_preparation"
+        :: Label label
         (* récupère l'adresse de la chaîne de caractères *)
         :: Lw (A0, Areg(4, V0))
         :: Jal "print" :: acc )
