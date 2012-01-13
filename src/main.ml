@@ -99,40 +99,40 @@ let () =
 	(* Erreur lexicale. On récupère sa position absolue et 
 	   on la convertit en numéro de ligne *)
 	localisation (Lexing.lexeme_start_p buf);
-	eprintf "Erreur dans l'analyse lexicale: %c@." c;
+	eprintf "Erreur dans l'analyse lexicale: %c\n." c;
 	exit 1
     | Parser.Error -> 
 	(* Erreur syntaxique. On récupère sa position absolue et on la 
 	   convertit en numéro de ligne *)
       localisation (Lexing.lexeme_start_p buf);
-      eprintf "Erreur dans l'analyse syntaxique@.";
+      eprintf "Erreur dans l'analyse syntaxique\n.";
       exit 1
     | Ast.Past.ClassMain pos ->
       (* Erreur syntaxique spéciale *)
       localisationBis pos ;
-      eprintf "Erreur dans l'analyse syntaxique.Mauvaise définition de class Main@.";
+      eprintf "Erreur dans l'analyse syntaxique.Mauvaise définition de class Main\n.";
       exit 1
     | Ast.Past.PasUnType pos ->
       (* Erreur syntaxique spéciale *)
       localisationBis pos ;
-      eprintf "Erreur dans l'analyse syntaxique. Ceci n'est pas un type@.";
+      eprintf "Erreur dans l'analyse syntaxique. Ceci n'est pas un type\n.";
       exit 1
     | Ast.Past.CommentaireNonTermine ->
       localisationBis { Ast.Past.file = "" ; line = 0 ; fChar = 0 ; lChar = 0 } ; (* position non déterminée *)
-      eprintf "Erreur dans l'analyse lexicale : commentaire non terminé@.";
+      eprintf "Erreur dans l'analyse lexicale : commentaire non terminé\n.";
       exit 1
     | AlreadyDefined (pos1, id, pos2) ->
       localisationBis pos1 ;
-      eprintf "Erreur : identifiant déjà défini@.";
+      eprintf "Erreur : identifiant déjà défini\n.";
       begin match pos2 with | None -> () | Some p -> localisationBis p end ;
       exit 1
     | Undefined (pos, id) ->
       localisationBis pos ;
-      eprintf "Erreur : %s cet identifiant n'a jamais été défini@." id ;
+      eprintf "Erreur : %s cet identifiant n'a jamais été défini\n." id ;
       exit 1
     | Her (pos, id, s) ->
       localisationBis pos ;
-      eprintf "Erreur d'héritage : %s %s@." id s ;
+      eprintf "Erreur d'héritage : %s %s \n." id s ;
       exit 1
     (* Les types sont pris ici dans Sast *)
     | WrongType (pos, ty, sty) ->
@@ -140,38 +140,38 @@ let () =
       eprintf "Erreur : ceci a le type %s" (affichePType ty) ;
       begin
       match sty with
-        | None -> eprintf "qui n'est pas le type compatible@."
+        | None -> eprintf "qui n'est pas le type compatible\n."
         | Some ty ->
-          eprintf "mais le type attendu était %s@." (affichePType ty) ;
+          eprintf " mais le type attendu était %s \n." (affichePType ty) ;
       end;
       exit 1
     | Duplicated(pos,id) ->
       localisationBis pos ;
-      eprintf "Erreur : plusieurs arguments portent le même nom@";
+      eprintf "Erreur : plusieurs arguments portent le même nom\n";
       exit 1
     | Missing(pos,classe,id) ->
       localisationBis pos ;
-      eprintf "Erreur : la classe %s n'a pas de champ %s de profil compatible@" classe id;
+      eprintf "Erreur : la classe %s n'a pas de champ %s de profil compatible\n" classe id;
       exit 1
     | NotALeftValue pos ->
       localisationBis pos ;
-      eprintf "Erreur : Ceci n'est pas une valeur gauche@." ;
+      eprintf "Erreur : Ceci n'est pas une valeur gauche\n." ;
       exit 1
     | BadConst(pos,const, classe) ->
       localisationBis pos ;
-      eprintf "Erreur : le constructeur %s n'a pas le même nom que la classe %s@" const classe;
+      eprintf "Erreur : le constructeur %s n'a pas le même nom que la classe %s \n" const classe;
       exit 1
     | Ambiguous(pos,name) ->
       localisationBis pos ;
-      eprintf "Erreur : ambiguité sur le choix de la méthode/constructeur %s@" name;
+      eprintf "Erreur : ambiguité sur le choix de la méthode/constructeur %s \n" name;
       exit 1
     | EReturn(pos,pos2) ->
       localisationBis pos ;
-      eprintf "Erreur : pas de return dans cette branche :@";
+      eprintf "Erreur : pas de return dans cette branche :\n";
       localisationBis pos2 ;
       exit 1
     | Failure s ->
-      eprintf "Erreur du compilateur : %s@." s ;
+      eprintf "Erreur du compilateur : %s \n." s ;
       exit 2 ;
   
 

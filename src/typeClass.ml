@@ -145,14 +145,17 @@ module ClassAnalysis = struct
   (** compare deux profils (liste de variable) *)
   let isDiffProf p1 p2 = 
     try
-      List.for_all2 (fun v1 v2 -> v1.v_type <> v2.v_type) p1 p2  
+      if (0 = (List.length p1)) && (List.length p2) = 0 then
+	false
+      else 
+	List.for_all2 (fun v1 v2 -> v1.v_type <> v2.v_type) p1 p2  
     with  Invalid_argument _ -> true
       
   (** vérifie que le callable simple a des profils différents de ceux des callables de liste et renvoit la nouvelle liste des callables en tenant compte des redéfinissions *)    
   let diff c liste scall =
     let atomic (acclist,check) elt =
       if not (isDiffProf scall.osimple_params elt.osimple_params) then (
-	if elt.osimple_classe == c.class_name then
+	if elt.osimple_classe = c.class_name then
 	  (raise (AlreadyDefined(scall.osimple_pos,scall.osimple_name,Some elt.osimple_pos)))
 	else
 	  (* on peut redéfinir une méthode UNE fois dans une classe *)
@@ -343,13 +346,25 @@ module  CheckInstr = struct
 	      | Some (c,_) -> isSubClass classes c1 (Cmap.find c classes)
     )
 
- 
+  exception Nf of string 
+      
   (** calcul si t1 est un sous type de t2 *)
   let isSubType classes t1 t2 = 
     match t1,t2 with
       | STypeNull,_ -> true
       | SBool,_ | SInt,_ -> (t1 = t2)
-      | (SC i1),(SC i2) -> isSubClass  classes (Cmap.find i1 classes) (Cmap.find i2 classes)
+      | (SC "String"),_ -> false
+      | _,(SC "String") -> false
+      | (SC i1),(SC i2) -> 
+	let c1 = try 
+		   (Cmap.find i1 classes)
+	  with Not_found -> (raise (Nf i1))
+	in 
+	let c2 = try 
+		   Cmap.find i2 classes
+	  with Not_found -> (raise (Nf i2)) 
+	in
+	isSubClass  classes c1 c2  
       | _ -> false
 
 
@@ -448,8 +463,8 @@ module  CheckInstr = struct
     | Assign(p,(Getval(p1,left)),e) ->
       let left = typLeft classes c env p1 left in
       let exp = typExpr classes c env e in
-      if not (isSubType classes exp.st left.lt) then
-	raise (WrongType(exp.sp, exp.st, Some(left.lt)))
+	if not (isSubType classes exp.st left.lt) then
+	  raise (WrongType(exp.sp, exp.st, Some(left.lt)))
       else
 	{ sp = p; st = left.lt; sv = SAssign(left.lv,exp)}
     | Assign(p,e,e2) ->
@@ -599,7 +614,11 @@ module  CheckInstr = struct
     | Cast(p,t,e) -> 
       let e = typExpr classes c env e in
       let t = types_to_Sast t in
-      if ((isSubType classes t e.st) && (isSubType classes e.st t) ) then
+      if 
+	try 
+	  ((isSubType classes t e.st) && (isSubType classes e.st t) )
+	with Nf n-> (raise (Undefined(p,n)))
+      then
 	{ sv = SCast(t,e); sp = p; st = t }
       else
 	(raise  (WrongType(e.sp,e.st,Some t)))
