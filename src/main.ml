@@ -164,8 +164,6 @@ let () =
     | Failure s ->
       eprintf "Erreur du compilateur : %s@." s ;
       exit 2 ;
-    | _ ->
-      eprintf "Erreur indéterminée@." ;
-      exit 2 ;
+  
 
 

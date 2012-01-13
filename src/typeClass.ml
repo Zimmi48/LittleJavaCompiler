@@ -171,7 +171,7 @@ module ClassAnalysis = struct
       @param lastId le dernier identifiant des classes/constructeurs 
       @param d la liste descripteur de la classe mère *)
   let checkConst classes meths c lastId d =
-    let size = ref ((List.length d) - 1 ) in
+    let size = ref ((List.length d)) in
     let bDesc (accList,accMeths) const = 
       (* on vérifie que les profils sont bien formés *)
       let _ = isBFCall classes const in
@@ -209,7 +209,7 @@ module ClassAnalysis = struct
       @param lastId ref vers le dernier id des callables 
       @param c la classe*)
   let checkMethods classes meths d lastId c = 
-    let size = ref ((Cmap.cardinal d) - 1) in 
+    let size = ref ((Cmap.cardinal d)) in 
     (* construit une map des méthodes *)
     let bMap (accMap,accMeth) m =
       let _ = isBFCall classes m in
@@ -275,7 +275,11 @@ module ClassAnalysis = struct
 	let blackSet = Cset.add c blackSet in
 	let accMap = Cmap.add c cl accMap in
 	(* on trouve la liste des sous-classes *)
-	let liste = Cmap.find c hMap in
+	let liste = 
+	  try 
+	    Cmap.find c hMap 
+	  with Not_found -> [] 
+	in
 	let accMap,meths = List.fold_left (dfsVisit md cd blackSet) (accMap,meths) liste  in
 	accMap,meths
     in     
