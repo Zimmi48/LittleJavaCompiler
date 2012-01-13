@@ -97,6 +97,18 @@ module ClassAnalysis = struct
     | C "Object" | C "String" -> true
     | C c -> Cmap.mem c classes
     | _ -> false 
+
+  (** Ordre sur les types *)
+  let compTyp p1 p2 =
+    match p1.v_type,p2.v_type with
+      | t2,t1 when t1 = t2-> 0
+      | Int,Bool -> -1
+      | Bool,Int -> 1
+      | (C c1),Bool -> 1
+      | (C c1),Int -> 1
+      | (C c1),(C c2) -> String.compare c1 c2
+      | (_,_) -> failwith "Improbable"
+
       
   (** vérfie l'unicité des champs et que leurs types soient bien formés
       renvoit la map des attributs *)
@@ -175,15 +187,16 @@ module ClassAnalysis = struct
     let bDesc (accList,accMeths) const = 
       (* on vérifie que les profils sont bien formés *)
       let _ = isBFCall classes const in
+      (* on trie les paramètres *)
+      let params = List.sort compTyp const.call_params in
       (* on vérifie que tout les constructeurs ont le même nom *)
       if (String.compare const.call_name c.class_name) <> 0 then 
 	(raise (BadConst(const.call_pos,const.call_name,c.class_name)));
-      let _ = isBFCall classes const in
       let s = {
 	osimple_pos = const.call_pos;
 	osimple_returnType = Void;
 	osimple_name = const.call_name;
-	osimple_params = const.call_params;
+	osimple_params = params;
 	osimple_id = ( !lastId);
 	osimple_n = ( !size);
 	osimple_classe = c.class_name;
@@ -192,7 +205,7 @@ module ClassAnalysis = struct
       incr lastId;
       incr size;
       let o = {
-	ocall_params = const.call_params;
+	ocall_params = params;
 	ocall_body = const.call_body;
       }
       in
@@ -215,11 +228,12 @@ module ClassAnalysis = struct
     (* construit une map des méthodes *)
     let bMap (accMap,accMeth) m =
       let _ = isBFCall classes m in
+       let params = List.sort compTyp m.call_params in
       let s = { 
 	osimple_pos = m.call_pos;
 	osimple_id = ( !lastId);
 	osimple_n = ( !size);
-	osimple_params = m.call_params;
+	osimple_params = params;
 	osimple_classe = c.class_name;
 	osimple_name = m.call_name;
 	osimple_returnType = m.call_returnType ;
@@ -227,7 +241,7 @@ module ClassAnalysis = struct
       in
       incr lastId ; incr size ;
       let o = {
-	ocall_params = m.call_params;
+	ocall_params = params;
 	ocall_body = m.call_body;
       }
       in
@@ -303,6 +317,17 @@ module  CheckInstr = struct
   open Sast
   open Exceptions
 
+ (** Ordre sur les types *)
+  let compTyp e1 e2 =
+    match e1.st,e2.st with
+      | t2,t1 when t1 = t2-> 0
+      | SInt,SBool -> -1
+      | SBool,SInt -> 1
+      | (SC c1),SBool -> 1
+      | (SC c1),SInt -> 1
+      | (SC c1),(SC c2) -> String.compare c1 c2
+      | (_,_) -> failwith "Improbable"
+
  (** calcule si une classe c1 hérite d'une autre classe c2 *)
   let rec isSubClass classes c1 c2 =
     if c1.oclass_name = c2.oclass_name then
@@ -371,12 +396,6 @@ module  CheckInstr = struct
      with Failure _ ->  ()  );
     meth
 	
-let affichePType = function
-  | Ast.Sast.SVoid -> "Void"
-  | Ast.Sast.SBool -> "Bool"
-  | Ast.Sast.SInt -> "Int"
-  | Ast.Sast.SC s -> s
-  | Ast.Sast.STypeNull -> "Type Null"
 
   type leftValue = { lv : svars; lt:  stypes }
        
@@ -547,6 +566,8 @@ let affichePType = function
       else
 	(
 	  let li = List.map (typExpr classes c env) li in
+	  (* on trie le profil *)
+	  let li = List.sort compTyp li in
 	  let meth = findCall classes cl p cl.oclass_methodesdesc m 
 	    (List.map (fun elt -> elt.st) li) 
 	  in
@@ -559,6 +580,8 @@ let affichePType = function
 	with Not_found -> (raise (Undefined(p,n)))
       in
       let args = List.map (typExpr classes c env) args in
+      (* on trie le profil *)
+      let args = List.sort compTyp args in
       (* S'il n'y a pas de constructeur correspondant ET aucun argument
 	 on considère qu'on utilise aucun constructeur *)
       let constId =
