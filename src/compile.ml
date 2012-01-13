@@ -153,22 +153,22 @@ let compile_program p ofile =
                           :: acc
                       else function acc -> acc
                     end (
-                    Arith (Add, SP, SP, Oimm 4)
-                    :: Lw (T0, Areg (0, SP)) (* cherche la valeur de e1 *)
-                    :: Arith (
-                      begin
-                        match op with
-                          | Eq -> Mips.Eq | Neq -> Mips.Neq
-                          | Leq -> Mips.Leq | Geq -> Mips.Geq
-                          | Lt -> Mips.Lt | Gt -> Mips.Gt
-                          | Plus -> Add
-                          | Minus -> Sub
-                          | Star -> Mul
-                          | Div -> Mips.Div | Mod -> Mips.Mod
-                          | _ -> failwith "Typage mal fait"
-                      end
-                        , V0, T0, Oreg V0 )
-                    :: acc )
+                      Arith (Add, SP, SP, Oimm 4)
+                      :: Lw (T0, Areg (0, SP)) (* cherche la valeur de e1 *)
+                       :: Arith (
+                         begin
+                           match op with
+                             | Eq -> Mips.Eq | Neq -> Mips.Neq
+                             | Leq -> Mips.Leq | Geq -> Mips.Geq
+                             | Lt -> Mips.Lt | Gt -> Mips.Gt
+                             | Plus -> Add
+                             | Minus -> Sub
+                             | Star -> Mul
+                             | Div -> Mips.Div | Mod -> Mips.Mod
+                             | _ -> failwith "Typage mal fait"
+                         end
+                           , V0, T0, Oreg V0 )
+                       :: acc )
                   else if e1.st = SBool then (* nécessairement e2.st = SBool *)
                     Arith (Add, SP, SP, Oimm 4)
                     :: Lw (T0, Areg (0, SP)) (* cherche la valeur de e1 *)
@@ -194,8 +194,14 @@ let compile_program p ofile =
                     :: Lw (T0, Areg (0, SP)) (* cherche la valeur de e1 *)
                     :: Arith (Mips.Neq, V0, V0, Oreg T0) (* égalité physique *)
                     :: acc
-                  else failwith "Not implemented"
-                (* rajouter la concaténation de chaînes *)
+                  else if op = Plus & e1.st = SC "String" & e2.st = SC "String"
+                  then
+                    Arith (Add, SP, SP, Oimm 4)
+                    :: Lw (A0, Areg (0, SP)) (* cherche la valeur de e1 *)
+                    :: Move (A1, V0)
+                    :: Jal "String_concat"
+                    :: acc
+                  else failwith "String of int not implemented"
                 end ) )
     | SCast (typ, e) ->
       compile_expr e env (
@@ -564,22 +570,74 @@ let compile_program p ofile =
        Li (A0, 2) ;
        Li (V0, 17);
        Syscall;
-(*
-       Label "String_concat" ;
-       Li (T0 , 0) (* on compte la nouvelle longueur *)
-       Lw (A0, Areg(4, A0)) ; (* chargement des adresse des chaînes *)
+
+       Label "String_concat" ; (* implémentation de la concaténation *)
+       Li (T0 , 4); (* on compte la nouvelle longueur *)
+       (* ne lève pas d'erreur si on essaye la concaténation avec NULL *)
+       Lw (A0, Areg(4, A0)) ; (* chargement des adresses des chaînes *)
        Lw (A1, Areg(4, A1)) ;
+
+       Sw (A0, Areg(0, SP)); (* sauve les adresses des chaînes sur la pile *)
+       Sw (A1, Areg(-4, SP));
+       (* pas de mise a jour de SP car pas d'appels de fcts a venir *)
        
        Label "String_concat_boucle1";
+       Lw (T1, Areg(0, A0));
+       Beqz (T1, "String_concat_boucle2");
        Arith (Add, T0, T0, Oimm 4);
        Arith (Add, A0, A0, Oimm 4);
        J "String_concat_boucle1";
        
        Label "String_concat_boucle2";
+       Lw (T1, Areg(0, A1));
+       Beqz (T1, "String_concat_allocs");
        Arith (Add, T0, T0, Oimm 4);
        Arith (Add, A1, A1, Oimm 4);
        J "String_concat_boucle2";
-*)     
+       
+       Label "String_concat_allocs";
+       (* alloc dynamique : création de la chaîne *)
+       Li (V0, 9);
+       Move (A0, T0);
+       Syscall;
+       Move (T0, V0);
+
+       (* récupération des adresses des deux chaînes *)
+       Sw (A0, Areg(0, SP));
+       Sw (A1, Areg(-4, SP));
+       
+       (* construction de la chaîne concaténée *)
+       Label "String_concat_boucle3";
+       Lw (T1, Areg(0, A0)) ;
+       Beqz (T1, "String_concat_boucle4");
+       Sw (T1, Areg(0, T0)) ; (* copie un caractère *)
+       Arith (Add, T0, T0, Oimm 4); (* position dans la nouvelle chaîne *)
+       Arith (Add, A0, A0, Oimm 4);
+       J "String_concat_boucle3";
+       
+       Lw (T1, Areg(0, A1)) ; (* copie un caractère *)
+       Sw (T1, Areg(0, T0)) ;
+       Label "String_concat_boucle4";
+       (* on sort après avoir écrit le caractère de fin de chaîne *)
+       Beqz (T1, "String_concat_allocs2");
+       Arith (Add, T0, T0, Oimm 4);
+       Arith (Add, A1, A1, Oimm 4);
+       Lw (T1, Areg(0, A1)) ; (* copie un caractère *)
+       Sw (T1, Areg(0, T0)) ;
+       J "String_concat_boucle4";
+       
+       Label "String_concat_allocs2";
+       Move (T0, V0); (* sauve l'adresse de la chaîne *)
+       (* alloc dynamique *)
+       Li (V0, 9);
+       Li (A0, 8);
+       Syscall;
+       (* place l'adresse de la chaine dans le champ correspondant *)
+       Sw (T0, Areg(4, V0));
+      
+       La(T0, "descr_general_String");
+       Sw(T0, Areg(0, V0) );
+     
       (* rajouter les implémentations de concat et String_ofint *)
       ] in
   let n = Array.length p.smeths in

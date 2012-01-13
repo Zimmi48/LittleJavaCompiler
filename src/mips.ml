@@ -114,7 +114,7 @@ let print_instruction fmt = function
   | Syscall ->
     fprintf fmt "\tsyscall\n"
   | Label s ->
-    fprintf fmt "%s:" s
+    fprintf fmt "%s:\n" s
 
 let print_data fmt = function
   | DLabel s ->
