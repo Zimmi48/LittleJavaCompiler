@@ -100,7 +100,7 @@ classe:
 ;
 
 extends:
-  LP EXTENDS id = IDENT RP { id , position $startpos $endpos }
+  EXTENDS id = IDENT { id , position $startpos $endpos }
 ;
 
 decl:
