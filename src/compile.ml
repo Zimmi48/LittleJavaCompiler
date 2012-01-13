@@ -16,9 +16,9 @@ let compile_program p ofile =
     begin
       match classe.sclass_extends with
           Some pere ->
-            if not (Cmap.mem pere.id_id !classe_attrs) then
-              positionne_attrs pere.id_id (Cmap.find pere.id_id p.sclasses);
-            Cmap.find pere.id_id !classe_attrs
+            if not (Cmap.mem pere !classe_attrs) then
+              positionne_attrs pere (Cmap.find pere p.sclasses);
+            Cmap.find pere !classe_attrs
         | _ -> Cmap.empty
     end
     in
@@ -524,7 +524,7 @@ let compile_program p ofile =
     DLabel ("descr_general_" ^ name) ::
       begin (* la classe parent *)
         match classe.sclass_extends with
-            Some s -> AWord ("descr_general_" ^ s.id_id)
+            Some s -> AWord ("descr_general_" ^ s)
           | None -> Word 0
       end ::
       !constructeurs @

@@ -92,7 +92,7 @@ let () =
     (* Compilation de l'arbre de syntaxe abstraite p. Le code machine 
        résultant de cette transformation doit être écrit dans le fichier 
        cible ofile. *)
-(*    Compile.compile_program p !ofile*)
+    Compile.compile_program p !ofile
 
   with
     | Lexer.Lexing_error c -> 
