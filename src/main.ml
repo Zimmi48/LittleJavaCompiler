@@ -83,8 +83,8 @@ let () =
     if !parse_only then exit 0;
     
     (* Typage *)
-    let p = checkHerit p in
-    let p = typProg p in 
+    let p = ClassAnalysis.checkHerit p in
+    let p = CheckInstr.typProg p in 
     
     (* On s'arrête ici si on ne veut faire que le typage *)
     if !type_only then exit 0;
