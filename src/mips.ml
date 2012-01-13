@@ -27,7 +27,9 @@ type instruction =
   | Jr of register
   | Jalr of register * register
   | J of string
+  | Beq of register * register * string
   | Beqz of register * string
+  | Bnez of register * string
   | Syscall
   | Label of string
 
@@ -100,8 +102,12 @@ let print_instruction fmt = function
     fprintf fmt "\tjalr   %a, %a\n" print_register r1 print_register r2
   | J s ->
     fprintf fmt "\tj  %s\n" s
+  | Beq (r1, r2, s) ->
+    fprintf fmt "\tbeq   %a, %a, %s\n" print_register r1 print_register r2 s
   | Beqz (r,s) ->
     fprintf fmt "\tbeqz   %a, %s\n" print_register r s
+  | Bnez (r,s) ->
+    fprintf fmt "\tbnez   %a, %s\n" print_register r s
   | Syscall ->
     fprintf fmt "\tsyscall\n"
   | Label s ->

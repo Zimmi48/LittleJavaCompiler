@@ -39,7 +39,11 @@ let compile_program p ofile =
   let for_nb = ref 0 in
   let soi = string_of_int in
   let int_of_bool = function true -> 1 | false -> 0 in
-  let data = ref [DLabel "null" ; Word 0] (* l'adresse de NULL *)
+  let data = ref [
+    DLabel "cast_failure" ;
+    Asciiz "Cast failure" ;
+    DLabel "null" ;
+    Word 0] (* l'adresse de NULL *)
   in
   (** convention : SP pointe toujours sur le prochain mot libre de la pile*)
 
@@ -149,6 +153,16 @@ let compile_program p ofile =
               (* rajouter les comparaisons généralisées et la concaténation 
                  de chaînes *)
               end ) )
+    | SCast (typ, e) ->
+      compile_expr e env (
+        match typ with
+          | STypeNull -> Bnez (V0, "cast_false") :: acc
+          | SInt | SBool -> acc (* rien à faire *)
+          | SC classe ->
+            Move (A0, V0)
+            :: La (A1, "descr_general_" ^ classe)
+            :: Jal "cast"
+            :: acc )
     | SAssign (var, e) ->
       (* compile la valeur gauche avant l'expression comme javac *)
       compile_vars var env ( (* compile var et stocke sur la pile *)
@@ -185,6 +199,16 @@ let compile_program p ofile =
       (* la variable considérée est toujours un mot (4 octets) *)
       compile_vars var env (
         Lw (V0, Areg (0, V0)) :: acc )
+    | SInstanceof (e, typ) ->
+      compile_expr e env (
+        match typ with
+          | STypeNull -> Arith (Mips.Eq, V0, V0, Oimm 0) :: acc
+          | SC classe ->
+            Move (A0, V0)
+            :: La (A1, "descr_general_" ^ classe)
+            :: Jal "instanceof"
+            :: acc
+          | _ -> failwith "Typage de instanceof incorrect" )
     | SNew (name, constr, args) ->
       begin
         try
@@ -222,7 +246,6 @@ let compile_program p ofile =
       compile_expr e env (
         Move (A0, V0) ::
         Jal "print" :: acc )
-    | _ -> failwith "Not implemented"
   in
 
 
@@ -395,7 +418,51 @@ let compile_program p ofile =
       [Label "print"; (* implémentation de print *)
        Li (V0, 1);
        Syscall;
-       Jr RA] in
+       Jr RA;
+
+       Label "instanceof"; (* implémentation de instanceof *)
+       (* A0 contient un objet , A1 l'adresse du descripteur de la classe
+          dont on teste si elle est parent *)
+       Beqz (A0, "instanceof_true"); (* teste si l'objet est null *)
+
+       (* on récupère l'adresse du descripteur de la classe de l'objet A0 *)
+       (* ou celui de la classe parent *)
+       Label "instanceof_aux";
+       Lw (A0, Areg(0, A0));
+       Beq (A0, A1, "instanceof_true"); (* si les classes sont les mêmes *)
+       Beqz (A0, "instanceof_false"); (* sinon si on a atteint Object *)
+       J "instanceof_aux";
+
+       Label "instanceof_true";
+       Li (V0, 1);
+       Jr RA;
+       Label "instance_of_false";
+       Li (V0, 0);
+       Jr RA;
+
+       Label "cast"; (* implémentation de cast *)
+       (* A0 contient un objet , A1 l'adresse du descripteur de la classe
+          dont on teste si elle est parent *)
+       Move (V0, A0); (* on renverra l'objet si le cast marche *)
+       Beqz (A0, "cast_true"); (* teste si l'objet est null *)
+
+       (* on récupère l'adresse du descripteur de la classe de l'objet A0 *)
+       (* ou celui de la classe parent *)
+       Label "cast_aux";
+       Lw (A0, Areg(0, A0));
+       Beq (A0, A1, "cast_true"); (* si les classes sont les mêmes *)
+       Beqz (A0, "cast_false"); (* sinon si on a atteint Object *)
+       J "cast_aux";
+
+       Label "cast_true";
+       Jr RA;
+       Label "cast_false";
+       La (A0, "cast_failure"); (* on affiche l'erreur *)
+       Jal "print";
+       Li (V0, 17); (* on termine avec un code d'erreur *)
+       Li (A0, 1);
+       Syscall
+      ] in
   let n = Array.length p.smeths in
   for i = 0 to n - 1 do
     methodes := compile_meth p.smeths.(i) i !methodes
