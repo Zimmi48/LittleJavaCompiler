@@ -213,8 +213,8 @@ acces:
 | e = expr DOT id = IDENT { Attr (e , id) }
 
 instructions:
-| i = instruction	           { [i] }
-| SEMICOLON l = instructions    { l }
+| 	                           { [] }
+| SEMICOLON l = instructions       { l }
 | i = instruction l = instructions { i::l }
 ;
 
