@@ -133,7 +133,7 @@ module ClassAnalysis = struct
   (** compare deux profils (liste de variable) *)
   let isDiffProf p1 p2 = 
     try
-      List.for_all2 (fun v1 v2 -> v1.v_type != v2.v_type) p1 p2  
+      List.for_all2 (fun v1 v2 -> v1.v_type <> v2.v_type) p1 p2  
     with  Invalid_argument _ -> true
       
   (** vérifie que le callable simple a des profils différents de ceux des callables de liste et renvoit la nouvelle liste des callables en tenant compte des redéfinissions *)    
@@ -147,7 +147,7 @@ module ClassAnalysis = struct
 	  (if check then 
 	      (raise (AlreadyDefined (scall.osimple_pos,scall.osimple_name,Some elt.osimple_pos)));
 	   (* on doit vérifier que la redéfinition a le même type de retour *)
-	   if elt.osimple_returnType != scall.osimple_returnType then 
+	   if elt.osimple_returnType <> scall.osimple_returnType then 
 	     (raise (WrongType(scall.osimple_pos,types_to_Sast scall.osimple_returnType,Some (types_to_Sast elt.osimple_returnType))));
 	   (* Pour redéfinir, on remplace simplement la méthode *)
 	   let s = { scall with osimple_n = elt.osimple_n } in
@@ -176,7 +176,7 @@ module ClassAnalysis = struct
       (* on vérifie que les profils sont bien formés *)
       let _ = isBFCall classes const in
       (* on vérifie que tout les constructeurs ont le même nom *)
-      if (String.compare const.call_name c.class_name) != 0 then 
+      if (String.compare const.call_name c.class_name) <> 0 then 
 	(raise (BadConst(const.call_pos,const.call_name,c.class_name)));
       let _ = isBFCall classes const in
       let s = {
@@ -241,7 +241,7 @@ module ClassAnalysis = struct
     in
     let d,meths = List.fold_left bMap (d,meths) c.class_methods in
     (* On vérifie que toutes les méthodes définies de même nom ont des profils différents, si ce n'est pas le cas, c'est une redéfinition à traiter en conséquence *) 
-    let descriptor = Array.make (!size + 1) osimplEmpty in
+    let descriptor = Array.make (!size) osimplEmpty in
     Cmap.iter (fun n li -> 
       List.iter (fun elt -> descriptor.(elt.osimple_n) <- elt) li ) d ;
     (* on renvoit la nouvelle map la nouvelle liste de méthode, et le tableau *)
@@ -289,8 +289,8 @@ module ClassAnalysis = struct
     let liste = Cmap.find "Object" hMap in
     let classes,meths = List.fold_left (dfsVisit Cmap.empty [] Cset.empty) (Cmap.empty,[]) liste in
     let ar = Array.make !lastId { ocall_params = []; ocall_body = Block [] } in
-    lastId := 0;
-    List.iter (fun o -> ar.(!lastId) <- o ; incr lastId) meths;
+    decr lastId;
+    List.iter (fun o -> ar.(!lastId) <- o ; decr lastId) meths;
     { omeths = ar; oclasses = classes; oinstr = prog.instr }
       
     
@@ -305,14 +305,18 @@ module  CheckInstr = struct
 
  (** calcule si une classe c1 hérite d'une autre classe c2 *)
   let rec isSubClass classes c1 c2 =
-    match c1.oclass_extends with
-      | None -> if c2.oclass_name = "Object" then true else false
-      | Some (extends,_) ->
-        if c2.oclass_name = extends then true
-        else
-          match c2.oclass_extends with
-            | None -> false
-	    | Some (c,_) -> isSubClass classes c1 (Cmap.find c classes)
+    if c1.oclass_name = c2.oclass_name then
+      true
+    else (
+      match c1.oclass_extends with
+	| None -> if c2.oclass_name = "Object" then true else false
+	| Some (extends,_) ->
+          if c2.oclass_name = extends then true
+          else
+            match c2.oclass_extends with
+              | None -> false
+	      | Some (c,_) -> isSubClass classes c1 (Cmap.find c classes)
+    )
 
  
   (** calcul si t1 est un sous type de t2 *)
@@ -328,7 +332,7 @@ module  CheckInstr = struct
   let isSubProf classes p1 p2 = 
     try 
       List.for_all2 (fun t1 t2 -> isSubType classes t1 t2) p1 p2
-    with Failure _ -> false
+    with Invalid_argument _ -> false
 
   (** compare deux const/méthodes, relation d'ordre supposée totale *)
   let compCall classes c1 c2 = 
@@ -346,8 +350,8 @@ module  CheckInstr = struct
   let rec findCall classes cl p desc m args =
     let mList = Array.fold_left (fun accList elt -> 
       if elt.osimple_name = m then (
-	if (isSubProf classes args (List.map (fun v -> types_to_Sast v.v_type) elt.osimple_params)) then 
-	  elt::accList
+	if (isSubProf classes args (List.map (fun v -> types_to_Sast v.v_type) elt.osimple_params)) then (
+	  elt::accList )
 	else
 	  accList )
       else 
@@ -361,12 +365,19 @@ module  CheckInstr = struct
     in
     (* on vérifie qu'il n'y a qu'un seul minimum *)
     (try 
-       let elt = List.hd mList  in
+       let elt = List.hd (List.tl mList)  in
        if ( compCall classes meth elt) = 0 then
 	 (raise (Ambiguous(p,m)))
      with Failure _ ->  ()  );
     meth
 	
+let affichePType = function
+  | Ast.Sast.SVoid -> "Void"
+  | Ast.Sast.SBool -> "Bool"
+  | Ast.Sast.SInt -> "Int"
+  | Ast.Sast.SC s -> s
+  | Ast.Sast.STypeNull -> "Type Null"
+
   type leftValue = { lv : svars; lt:  stypes }
        
   (** Type les varleurs gauches *)
@@ -427,7 +438,7 @@ module  CheckInstr = struct
       (raise (NotALeftValue e.sp))
     | Pref(p,op,(Getval(p1,left))) ->
       let left = typLeft classes c env p1 left in
-      if left.lt != SInt then
+      if left.lt <> SInt then
 	(raise (WrongType (p,left.lt, Some (SInt))))
       else
 	{sv = SPref(op,left.lv); st = SInt; sp = p }
@@ -436,7 +447,7 @@ module  CheckInstr = struct
       (raise (NotALeftValue(e.sp)))
     | Post(p,op,(Getval(p1,left))) -> 
       let left = typLeft classes c env p1 left in
-      if left.lt != SInt then
+      if left.lt <> SInt then
 	(raise (WrongType (p,left.lt, Some (SInt))))
       else
 	{sv = SPost(op,left.lv); st = SInt; sp = p}
@@ -445,13 +456,13 @@ module  CheckInstr = struct
       (raise (NotALeftValue(e.sp)))
     | UMinus (p,e) ->
       let e = typExpr classes c env e in
-      if e.st != SInt then
+      if e.st <> SInt then
 	(raise (WrongType (e.sp,e.st, Some (SInt))))
       else
 	{sv = SUMinus(e); st = SInt; sp = p }
     | Not(p,e) ->
       let e =  typExpr classes c env e in
-      if e.st != SBool then
+      if e.st <> SBool then
 	(raise (WrongType (e.sp,e.st, Some (SBool))))
       else
 	{sv = SNot(e); st = SBool; sp = p }
@@ -634,7 +645,7 @@ module  CheckInstr = struct
 	| None -> {sv = SBconst true ; sp = { file = "unknown"; line = 0; fChar = 0; lChar = 0}; st = SBool}
 	| Some e -> (
 	  let e2 = typExpr classes c env e in
-	  if e2.st != SBool then (raise (WrongType(e2.sp,e2.st,Some SBool)));
+	  if e2.st <> SBool then (raise (WrongType(e2.sp,e2.st,Some SBool)));
 	  e2)
       in
       (* on considère qu'un return dans un for ne compte pas
@@ -659,7 +670,7 @@ module  CheckInstr = struct
     | Return(p,e) ->
       let e = match e with 
 	| None -> (
-	  if returnType != SVoid then 
+	  if returnType <> SVoid then 
 	    (raise (WrongType(p,SVoid,Some returnType)));
 	  None )
 	| Some f -> (
@@ -691,8 +702,8 @@ module  CheckInstr = struct
 	  (Cmap.add elt.v_name t accEnv),({id_id =elt.v_name;id_typ =t}::accList)
 	) (env,[]) call.ocall_params in
 	let return = match returnType with
-	  | SVoid -> true
-	  | _ -> false in
+	  | SVoid ->true
+	  | f -> false in
 	let _,instr,return = typInstr prog.oclasses return returnType pos c lenv call.ocall_body in
 	if not return then (raise (EReturn(pos,pos)));
 	{scall_returnType = returnType;

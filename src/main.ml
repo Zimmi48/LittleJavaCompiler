@@ -39,6 +39,13 @@ let localisationBis { Ast.Past.file = f ; line = l ;
                       fChar = fc ; lChar = lc } =
   eprintf "File \"%s\", line %d, characters %d-%d:\n" f l fc lc
 
+let affichePType = function
+  | Ast.Sast.SVoid -> "Void"
+  | Ast.Sast.SBool -> "Bool"
+  | Ast.Sast.SInt -> "Int"
+  | Ast.Sast.SC s -> s
+  | Ast.Sast.STypeNull -> "Type Null"
+
 let () = 
   (* Parsing de la ligne de commande *)
   Arg.parse options (set_file ifile) usage;
@@ -62,15 +69,7 @@ let () =
     
   (* Création d'un tampon d'analyse lexicale *)
   let buf = Lexing.from_channel f in
-
-  (* Préparation pour l'affichage des erreurs *)
-  let affichePType = function
-    | Ast.Sast.SVoid -> "Void"
-    | Ast.Sast.SBool -> "Bool"
-    | Ast.Sast.SInt -> "Int"
-    | Ast.Sast.SC s -> s
-    | Ast.Sast.STypeNull -> "Type Null"
-  in  
+ 
   try
     (* Parsing: la fonction  Parser.fichier transforme le tampon lexical en
        un arbre de syntaxe abstraite si aucune erreur (lexicale ou
