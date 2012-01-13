@@ -66,7 +66,7 @@ module ClassAnalysis = struct
   (**construit une Map de classes en vérifiant l'unicité du nommage *)
   let buildClassMap prog =
     let addClass (map,hmap) c =
-      if c.class_name == "Object" or c.class_name == "String" then 
+      if c.class_name = "Object" or c.class_name = "String" then 
 	raise (AlreadyDefined (c.class_pos,c.class_name,None)) ;
       if Cmap.mem c.class_name map then
 	let c1 = Cmap.find c.class_name map in
@@ -270,10 +270,10 @@ module ClassAnalysis = struct
   let checkHerit prog=
     let classes,hMap = buildClassMap prog in
     let lastId = ref 0 in
-    let rec dfsVisit  md cd blackSet (accMap,meths) (c,pos)=
-      if Cset.mem c blackSet then
+    let rec dfsVisit  md cd (accMap,meths,blackSet) (c,pos)=
+      if Cset.mem c blackSet then (
 	let cl = Cmap.find c classes in
-	(raise (Her(cl.class_pos,cl.class_name,"Cycle")))
+	(raise (Her(cl.class_pos,cl.class_name,"Cycle"))) )
       else
 	let cl = 
 	  try 
@@ -300,11 +300,13 @@ module ClassAnalysis = struct
 	    Cmap.find c hMap 
 	  with Not_found -> [] 
 	in
-	let accMap,meths = List.fold_left (dfsVisit md cd blackSet) (accMap,meths) liste  in
-	accMap,meths
+	let accMap,meths,blackSet = List.fold_left (dfsVisit md cd) (accMap,meths,blackSet) liste  in
+	accMap,meths,blackSet
     in     
     let liste = Cmap.find "Object" hMap in
-    let classes,meths = List.fold_left (dfsVisit Cmap.empty [] Cset.empty) (Cmap.empty,[]) liste in
+    if (liste = []) && ( not (Cmap.is_empty hMap)) then 
+      (raise (Her(emptyPos,"","Cycle")));
+    let classes,meths,_ = List.fold_left (dfsVisit Cmap.empty []) (Cmap.empty,[],Cset.empty) liste in
     let ar = Array.make !lastId { ocall_params = []; ocall_body = Block [] } in
     decr lastId;
     List.iter (fun o -> ar.(!lastId) <- o ; decr lastId) meths;
@@ -605,7 +607,7 @@ module  CheckInstr = struct
 	    (List.map (fun elt -> elt.st)args) in
 	  Some const.osimple_n 
 	with Missing(ep,ec,en) -> (
-	  if args = [] then 
+	  if args = [] && (Array.length cl.oclass_constsdesc) = 0 then 
 	    None 
 	  else
 	    (raise (Missing(ep,ec,en))))
@@ -647,11 +649,13 @@ module  CheckInstr = struct
       (env,SExpr(e),return)
     | Decl(p,t,id,None) ->       
       if not (ClassAnalysis.isBF classes t) then (raise (WrongType(p,(types_to_Sast t),None)));
+      if Cmap.mem id env then (raise (AlreadyDefined(p,id,None)));
       let t = types_to_Sast t in
       let id = { id_id = id; id_typ = t } in
       ((Cmap.add id.id_id id.id_typ env),(SDecl(p,t,id,None)),return)
     | Decl(p,t,id,Some e) ->
       if not (ClassAnalysis.isBF classes t) then (raise (WrongType(p,(types_to_Sast t),None)));
+      if Cmap.mem id env then (raise (AlreadyDefined(p,id,None)));
       let t = types_to_Sast t in
       let id = { id_id = id; id_typ = t } in
       let e = typExpr classes c env e in
@@ -662,7 +666,7 @@ module  CheckInstr = struct
       if not (e.st = SBool) then (raise (WrongType(e.sp,e.st,Some SBool)));
       let env1,i1,subreturn = typInstr classes return returnType pos c env i1 in
       let i2,return = match i2 with 
-	| None -> None,(subreturn || return)
+	| None -> None,(return)
 	| Some i -> (
 	  let _,i,subreturn2 = typInstr classes  return returnType pos c env i in
 	  (* Si on a trouvé un return dans l'une des deux branches mais pas 
