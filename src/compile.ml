@@ -6,9 +6,10 @@ open Format
 
 let compile_program p ofile =
 
-  (* cette map permet de savoir quelles classes ont été traitées et retient
+  (** cette map permet de savoir quelles classes ont été traitées et retient
      des maps associant les champs à des numéros *)
   let classe_attrs = ref Cmap.empty in
+
   (** détermine la place de chaque champ de chaque classe *)
   let rec positionne_attrs name classe =
     let attrs =
@@ -33,10 +34,11 @@ let compile_program p ofile =
   in
   let () = Cmap.iter positionne_attrs p.sclasses in
     
-
+  (** compteurs permettant d'avoir des labels différents *)
   let string_nb = ref 0 in
   let condition_nb = ref 0 in
   let for_nb = ref 0 in
+  let expr_bool_nb = ref 0 in
   let soi = string_of_int in
   let int_of_bool = function true -> 1 | false -> 0 in
   let data = ref [
@@ -69,8 +71,7 @@ let compile_program p ofile =
         match e.st with
           | SC classe ->
             compile_expr e env (
-              let pos = Cmap.find id.id_id (Cmap.find classe !classe_attrs) 
-              in
+              let pos = Cmap.find id.id_id (Cmap.find classe !classe_attrs) in
               let pos = (pos + 1) * 4 in
               Lw (V0, Areg(pos, V0)) :: acc )
           | _ -> failwith "Typage mal fait : n'est pas un objet."
@@ -81,11 +82,20 @@ let compile_program p ofile =
      stocke le résultat dans V0 *)
   and compile_expr expr env acc = match expr.sv with
     | SIconst i -> Li (V0, i) :: acc
-    | SSconst s ->
+    | SSconst s -> (* renvoit un objet de type String *)
       let adresse = "string_" ^ soi !string_nb in
       data := DLabel adresse :: Asciiz s :: !data ;
       incr string_nb ;
-      La (V0 , adresse) :: acc
+      (* alloc dynamique *)
+      Li (V0, 9)
+      :: Li (A0, 8)
+      :: Syscall
+      :: La(T0, "descr_general_String")
+      :: Sw(T0, Areg(0, V0) )
+      :: La (T0 , adresse)
+      (* place l'adresse de la chaine dans le champ correspondant *)
+      :: Sw (T0, Areg(4, V0))
+      :: acc
     | SBconst b -> Li (V0, int_of_bool b) :: acc
     | SNull -> La (V0, "null") :: acc
     | SNot e -> compile_expr e env (Arith (Mips.Eq, V0, V0, Oimm 0) :: acc)
@@ -109,50 +119,65 @@ let compile_program p ofile =
         (* la nouvelle valeur est replacée à l'adresse indiquée par T0 et
            l'ancienne valeur reste dans V0 en tant que valeur de retour *)
     | SBinaire (op, e1, e2) ->
-      (* surcharges de + et de = non gérées :
-         seulement fonctionne avec les ints et bool *)
-      (* attention : l'évaluation de and et or doit être paresseuse *)
-      compile_expr e1 env ( (* compile e1 et stocke sur la pile *)
-        Sw (V0, Areg (0, SP)) ::
-          Arith (Sub, SP, SP, Oimm 4) ::
-          compile_expr e2 env ( (* compile e2 et laisse dans V0 *)
-            Arith (Add, SP, SP, Oimm 4) ::
-              Lw (T0, Areg (0, SP)) :: (* cherche la valeur de e1 *)
-              begin
-              if e1.st = SInt & e2.st = SInt then
-                Arith (
-                  begin
-                    match op with
-                      | Eq -> Mips.Eq | Neq -> Mips.Neq
-                      | Leq -> Mips.Leq | Geq -> Mips.Geq
-                      | Lt -> Mips.Lt | Gt -> Mips.Gt
-                      | Plus -> Add
-                      | Minus -> Sub
-                      | Star -> Mul
-                      | Div -> Mips.Div | Mod -> Mips.Mod
-                      | _ -> failwith "Typage mal fait"
-                  end
-                    , V0, T0, Oreg V0 )
-                :: acc
-              else if e1.st = SBool & e2.st = SBool then
-                Arith (Mips.Neq, V0, V0, Oimm 0) ::
-              (* on renormalise : V0 != 0 devient 1 ; 0 reste 0
-                 afin que la comparaison Eq ou Neq ait lieu correctement *)
-                  Arith (Mips.Neq, T0, T0, Oimm 0) ::
-                  Arith (
-                    begin
-                      match op with
-                      | Eq -> Mips.Eq | Neq -> Mips.Neq
-                      | Or -> Add
-                      | And -> Mul
-                      | _ -> failwith "Typage mal fait"
-                  end
-                    , V0, T0, Oreg V0 )
-                :: acc
-              else failwith "Not implemented"
-              (* rajouter les comparaisons généralisées et la concaténation 
+      (* l'évaluation de and et or est paresseuse *)
+      compile_expr e1 env ( (* compile e1 *)
+        if e1.st = SBool & op = Or then (* nécessairement e2.st = SBool *)
+          let label_fin = "expr_bool_fin_" ^ soi !expr_bool_nb in
+          incr expr_bool_nb ;
+            Bnez (V0, label_fin)
+            :: Sw (V0, Areg (0, SP)) (* et stocke sur la pile *)
+            :: Arith (Sub, SP, SP, Oimm 4)
+            :: compile_expr e2 env ( (* compile e2 et laisse dans V0 *)
+              Label label_fin (* la valeur de retour se trouve déjà dans V0 *)
+              :: acc )
+        else if e1.st = SBool & op = And then
+          let label_fin = "expr_bool_fin_" ^ soi !expr_bool_nb in
+          incr expr_bool_nb ;
+            Beqz (V0, label_fin)
+            :: Sw (V0, Areg (0, SP)) (* et stocke sur la pile *)
+            :: Arith (Sub, SP, SP, Oimm 4)
+            :: compile_expr e2 env ( (* compile e2 et laisse dans V0 *)
+              Label label_fin (* la valeur de retour se trouve déjà dans V0 *)
+              :: acc )
+        else
+          Sw (V0, Areg (0, SP)) :: (* et stocke sur la pile *)
+            Arith (Sub, SP, SP, Oimm 4) ::
+            compile_expr e2 env ( (* compile e2 et laisse dans V0 *)
+              Arith (Add, SP, SP, Oimm 4) ::
+                Lw (T0, Areg (0, SP)) :: (* cherche la valeur de e1 *)
+                begin
+                  if e1.st = SInt & e2.st = SInt then
+                    Arith (
+                      begin
+                        match op with
+                          | Eq -> Mips.Eq | Neq -> Mips.Neq
+                          | Leq -> Mips.Leq | Geq -> Mips.Geq
+                          | Lt -> Mips.Lt | Gt -> Mips.Gt
+                          | Plus -> Add
+                          | Minus -> Sub
+                          | Star -> Mul
+                          | Div -> Mips.Div | Mod -> Mips.Mod
+                          | _ -> failwith "Typage mal fait"
+                      end
+                        , V0, T0, Oreg V0 )
+                    :: acc
+                  else if e1.st = SBool then (* nécessairement e2.st = SBool *)
+                    Arith (Mips.Neq, V0, V0, Oimm 0) ::
+                      (* on renormalise : V0 != 0 devient 1 ; 0 reste 0 afin
+                         que la comparaison Eq ou Neq ait lieu correctement *)
+                      Arith (Mips.Neq, T0, T0, Oimm 0) ::
+                      Arith (
+                        begin
+                          match op with
+                            | Eq -> Mips.Eq | Neq -> Mips.Neq
+                            | _ -> failwith "Typage mal fait ou erreur 42"
+                        end
+                          , V0, T0, Oreg V0 )
+                    :: acc
+                  else failwith "Not implemented"
+                (* rajouter les comparaisons généralisées et la concaténation 
                  de chaînes *)
-              end ) )
+                end ) )
     | SCast (typ, e) ->
       compile_expr e env (
         match typ with
@@ -162,7 +187,8 @@ let compile_program p ofile =
             Move (A0, V0)
             :: La (A1, "descr_general_" ^ classe)
             :: Jal "cast"
-            :: acc )
+            :: acc
+          | _ -> failwith "On ne devrait pas avoir de cast avec void" )
     | SAssign (var, e) ->
       (* compile la valeur gauche avant l'expression comme javac *)
       compile_vars var env ( (* compile var et stocke sur la pile *)
@@ -210,7 +236,9 @@ let compile_program p ofile =
             :: acc
           | _ -> failwith "Typage de instanceof incorrect" )
     | SNew (name, constr, args) ->
-      begin
+      if name = "String" then
+        failwith "Il est interdit d'instancier String : typage incorrect"
+      else begin
         try
           (* alloc dynamique *)
           Li (V0, 9)
@@ -242,10 +270,11 @@ let compile_program p ofile =
           end
         with _ -> failwith "Compilation de New"
       end
-    | SPrint e ->
+    | SPrint e -> (* prend en argument un objet de type String *)
       compile_expr e env (
-        Move (A0, V0) ::
-        Jal "print" :: acc )
+        Lw (A0, Areg(4, V0)) (* récupère l'adresse de la chaîne de caractères *)
+        (* rajouter une erreur en cas de pointeur nul ?? *)
+        :: Jal "print" :: acc )
   in
 
 
@@ -462,6 +491,8 @@ let compile_program p ofile =
        Li (V0, 17); (* on termine avec un code d'erreur *)
        Li (A0, 1);
        Syscall
+
+      (* rajouter les implémentations de String_equals, concat, String_ofint *)
       ] in
   let n = Array.length p.smeths in
   for i = 0 to n - 1 do
@@ -473,7 +504,12 @@ let compile_program p ofile =
   (** compilation des classes : crée un descripteur à placer dans le tas
       suivi de acc *)
   let compile_classe name classe acc =
-    let methodes = ref [] in (* rajouter String *)
+    let methodes = ref [
+      DLabel "descr_general_String"; (* description de String , à part *)
+      Word 0; (* hérite de Object *)
+      DLabel "descr_meth_String";
+      AWord ("String_equals") (* seule méthode de String disponible *)
+    ] in
     let n = Array.length classe.sclass_methods in
     for i = n - 1 downto 0 do
       methodes := AWord ("debut_meth_" ^ soi classe.sclass_methods.(i) )
