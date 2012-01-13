@@ -126,12 +126,15 @@ let () =
       localisationBis pos1 ;
       eprintf "Erreur : identifiant déjà défini@.";
       begin match pos2 with | None -> () | Some p -> localisationBis p end ;
+      exit 1
     | Undefined (pos, id) ->
       localisationBis pos ;
-      eprintf "Erreur : %s cet identifiant n'a jamais été défini@." id
+      eprintf "Erreur : %s cet identifiant n'a jamais été défini@." id ;
+      exit 1
     | Her (pos, id, s) ->
       localisationBis pos ;
       eprintf "Erreur d'héritage : %s %s@." id s ;
+      exit 1
     (* Les types sont pris ici dans Sast *)
     | WrongType (pos, ty, sty) ->
       localisationBis pos ;
@@ -141,26 +144,33 @@ let () =
         | None -> eprintf "qui n'est pas le type compatible@."
         | Some ty ->
           eprintf "mais le type attendu était %s@." (affichePType ty) ;
-      end
+      end;
+      exit 1
     | Duplicated(pos,id) ->
       localisationBis pos ;
       eprintf "Erreur : plusieurs arguments portent le même nom@";
+      exit 1
     | Missing(pos,classe,id) ->
       localisationBis pos ;
       eprintf "Erreur : la classe %s n'a pas de champ %s de profil compatible@" classe id;
+      exit 1
     | NotALeftValue pos ->
       localisationBis pos ;
       eprintf "Erreur : Ceci n'est pas une valeur gauche@." ;
+      exit 1
     | BadConst(pos,const, classe) ->
       localisationBis pos ;
       eprintf "Erreur : le constructeur %s n'a pas le même nom que la classe %s@" const classe;
+      exit 1
     | Ambiguous(pos,name) ->
       localisationBis pos ;
       eprintf "Erreur : ambiguité sur le choix de la méthode/constructeur %s@" name;
+      exit 1
     | EReturn(pos,pos2) ->
       localisationBis pos ;
       eprintf "Erreur : pas de return dans cette branche :@";
       localisationBis pos2 ;
+      exit 1
     | Failure s ->
       eprintf "Erreur du compilateur : %s@." s ;
       exit 2 ;
