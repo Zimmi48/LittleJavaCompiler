@@ -690,7 +690,10 @@ module  CheckInstr = struct
 	  let t = types_to_Sast elt.v_type in
 	  (Cmap.add elt.v_name t accEnv),({id_id =elt.v_name;id_typ =t}::accList)
 	) (env,[]) call.ocall_params in
-	let _,instr,return = typInstr prog.oclasses false returnType pos c lenv call.ocall_body in
+	let return = match returnType with
+	  | SVoid -> true
+	  | _ -> false in
+	let _,instr,return = typInstr prog.oclasses return returnType pos c lenv call.ocall_body in
 	if not return then (raise (EReturn(pos,pos)));
 	{scall_returnType = returnType;
 	 scall_params = params;
@@ -735,7 +738,7 @@ module  CheckInstr = struct
       oclass_constsdesc = [||];
     } in
     let env = Cmap.add "this" (SC "Main") Cmap.empty in
-    let _,instr,return = typInstr (Cmap.add "Main" classMain prog.oclasses) false SVoid ClassAnalysis.emptyPos classMain env prog.oinstr in
+    let _,instr,return = typInstr (Cmap.add "Main" classMain prog.oclasses) true SVoid ClassAnalysis.emptyPos classMain env prog.oinstr in
     if not return then (raise (EReturn(ClassAnalysis.emptyPos,ClassAnalysis.emptyPos)));
     { sclasses = classes;
       smeths = meths;
