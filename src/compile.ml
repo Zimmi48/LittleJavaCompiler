@@ -184,16 +184,16 @@ let compile_program p ofile =
                       end
                         , V0, T0, Oreg V0 )
                     :: acc
-                  else if e1.st = SC "String" & (op = Eq or op = Neq) then
-                    Sw (V0, Areg (0, SP)) (* stocke e2 sur la pile *)
-                    :: Arith (Sub, SP, SP, Oimm 4)
-                    :: Jal "String_equals"
-                    :: Arith (Add, SP, SP, Oimm 8) (* libère la pile *)
-                    ::
-                      if op = Eq then
-                        acc
-                      else (* on passe au not *)
-                        Arith (Mips.Eq, V0, V0, Oimm 0) :: acc
+                  else if op = Eq then
+                    Arith (Add, SP, SP, Oimm 4)
+                    :: Lw (T0, Areg (0, SP)) (* cherche la valeur de e1 *)
+                    :: Arith (Mips.Eq, V0, V0, Oreg T0) (* égalité physique *)
+                    :: acc
+                  else if op = Neq then
+                    Arith (Add, SP, SP, Oimm 4)
+                    :: Lw (T0, Areg (0, SP)) (* cherche la valeur de e1 *)
+                    :: Arith (Mips.Neq, V0, V0, Oreg T0) (* égalité physique *)
+                    :: acc
                   else failwith "Not implemented"
                 (* rajouter les comparaisons entre objets != string
                    et la concaténation de chaînes *)
