@@ -94,7 +94,7 @@ module Past = struct
     | For of expr option * expr option * expr option * instruction option
     | Block of instruction list
     (** Expression optionnelles, pour les méthodes void *)
-    | Return of expr option
+    | Return of pos * expr option
 
   (** Les variables associèes à leur type *)
   type variable = {v_type : types ; v_name : ident; v_pos : pos }

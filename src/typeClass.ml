@@ -42,6 +42,8 @@ module Exceptions = struct
   (** Deux constructeurs/méthodes conviennent *)
   exception Ambiguous of pos * string
 
+  (** Unf flot d'éxcution peut ne pas rencontrer d'instruction return, pos de la classe, pos du début de la branche *)
+  exception EReturn of pos * pos
 
 end
 
@@ -573,37 +575,45 @@ module  CheckInstr = struct
 	  | _ -> (raise (WrongType(e.sp,e.st,None)))
       end
 	
-
-  (** Levée quand on tombe sur l'instruction return *)
-  exception EReturn of sexpr
-      
-  (** typage des instructions *)
-  let rec typInstr classes c env = function
+  (** typage des instructions 
+      @param classes   la map des classes 
+      @param c  la classe courante
+      @param env l'enrivronnement de typage
+      @param return booléen décrivant si on a trouvé un Return dans la branche
+  *)
+  let rec typInstr classes return returnType pos c env = function
     | Expr(e) ->
       let e = typExpr classes c env e in
-      env,SExpr(e)
+      (env,SExpr(e),return)
     | Decl(p,t,id,None) ->       
       if not (ClassAnalysis.isBF classes t) then (raise (WrongType(p,(types_to_Sast t),None)));
       let t = types_to_Sast t in
       let id = { id_id = id; id_typ = t } in
-      (Cmap.add id.id_id id.id_typ env),(SDecl(p,t,id,None))
+      ((Cmap.add id.id_id id.id_typ env),(SDecl(p,t,id,None)),return)
     | Decl(p,t,id,Some e) ->
       if not (ClassAnalysis.isBF classes t) then (raise (WrongType(p,(types_to_Sast t),None)));
       let t = types_to_Sast t in
       let id = { id_id = id; id_typ = t } in
       let e = typExpr classes c env e in
       if not (isSubType classes e.st t) then (raise (WrongType(e.sp,e.st,Some t)));
-      ((Cmap.add id.id_id id.id_typ env),(SDecl(p,t,id,Some e)))
+      ((Cmap.add id.id_id id.id_typ env),(SDecl(p,t,id,Some e)),return)
     | If(e,i1,i2) ->
       let e = typExpr classes c env e in
       if not (e.st = SBool) then (raise (WrongType(e.sp,e.st,Some SBool)));
-      let env1,i1 = typInstr classes c env i1 in
-      let i2 = match i2 with 
-	| None -> None 
-	| Some i -> let _,i = typInstr classes c env i in
-		    Some (i)
+      let env1,i1,subreturn = typInstr classes return returnType pos c env i1 in
+      let i2,return = match i2 with 
+	| None -> None,(subreturn || return)
+	| Some i -> (
+	  let _,i,subreturn2 = typInstr classes  return returnType pos c env i in
+	  (* Si on a trouvé un return dans l'une des deux branches mais pas 
+	     au dessus dans la branche courante, il y a un flux d'execution
+	     potentiellement sans retour *)
+	  if (not return ) && (subreturn || subreturn2 ) && ( not (subreturn && subreturn2)) 
+	  then
+	    (raise (EReturn(pos,e.sp))) ;
+	  (Some (i)),(return || subreturn || subreturn2))
       in
-      (env,(SIf(e,i1,i2)))
+      (env,(SIf(e,i1,i2)),return)
     | For(e1,e2,e3,i) -> 
       let e1 = match e1 with
 	| None -> None 
@@ -620,25 +630,38 @@ module  CheckInstr = struct
 	  if e2.st != SBool then (raise (WrongType(e2.sp,e2.st,Some SBool)));
 	  e2)
       in
+      (* on considère qu'un return dans un for ne compte pas
+	 il en faut un à l'extèrieur du for, pour être sûr de sa présence,
+	 car on pourrait ne jamais entrer dans le for *)
       let i = match i with
 	| None -> None
-	| Some f -> let _,i = typInstr classes c env f in
-		    Some i
+	| Some f -> let _,i,_ = 
+		      typInstr classes return returnType pos  c env f in
+		    (Some i)
       in
-      (env,(SFor(e1,e2,e3,i)))
+      (env,(SFor(e1,e2,e3,i)),return)
     | Block(li) -> 
-      let _,li = List.fold_left (fun (accenv,acclist) i ->
-	let nenv,i = typInstr classes c accenv i in
-	(nenv,(i::acclist))) (env,[]) li 
+      let _,li,return = List.fold_left (fun (accenv,acclist,accreturn) i ->
+	let nenv,i,accreturn = 
+	  typInstr classes accreturn returnType pos c accenv i 
+	in
+	(nenv,(i::acclist),accreturn)) (env,[],return) li 
       in
       let li = List.rev li in
-      (env,(SBlock(li)))
-    | Return(e) ->
+      (env,(SBlock(li)),return)
+    | Return(p,e) ->
       let e = match e with 
-	| None -> None 
-	| Some f -> Some (typExpr classes c env f)
+	| None -> (
+	  if returnType != SVoid then 
+	    (raise (WrongType(p,SVoid,Some returnType)));
+	  None )
+	| Some f -> (
+	  let exp = typExpr classes c env f in
+	  if not (isSubType classes exp.st returnType) then
+	    (raise (WrongType(exp.sp,exp.st,Some returnType)));
+	  Some exp)
       in
-      (env,(SReturn(e)))
+      (env,(SReturn(e)),true)
 (*	
   (** type un programme Oast vers un programme Sast *)
   let typProg prog = 

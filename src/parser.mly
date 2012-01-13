@@ -254,4 +254,4 @@ instructionSansFinParIfSolo:
 	i = instructionSansFinParIfSoloOption
     { For (e1 , e2 , e3 , i) }
 | LB l = instructions RB { Block l }
-| RETURN e = expr? SEMICOLON { Return e }
+| RETURN e = expr? SEMICOLON { Return(position $startpos $endpos,e) }
