@@ -28,6 +28,7 @@ type instruction =
   | Jalr of register * register
   | J of string
   | Beq of register * register * string
+  | Bne of register * register * string
   | Beqz of register * string
   | Bnez of register * string
   | Syscall

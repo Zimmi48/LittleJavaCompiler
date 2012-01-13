@@ -491,7 +491,7 @@ let compile_program p ofile =
        Li (V0, 17); (* on termine avec un code d'erreur *)
        Li (A0, 1);
        Syscall;
-(*
+
        Label "String_equals"; (* implémentation de String.equals *)
        (* this et l'argument à comparer sont sur la pile *)
        Lw (A0, Areg(4, SP)) ;
@@ -505,7 +505,11 @@ let compile_program p ofile =
        Lw (A0, Areg(4, A0)) ; (* chargement des adresse des chaînes *)
        Lw (A1, Areg(4, A1)) ;
        
-       Beqz (
+       Label "String_equals_boucle";
+       Bne (A0, A1, "String_equals_false");
+       Beqz (A0, "String_equals_true");
+       Arith (Add, SP, SP, Oimm 4);
+       J "String_equals_boucle";
 
        Label "String_equals_false" ;
        Li (V0, 0) ;
@@ -514,7 +518,7 @@ let compile_program p ofile =
        Label "String_equals_true" ;
        Li (V0, 1) ;
        Jr RA
-*)
+
       (* rajouter les implémentations de concat et String_ofint *)
       ] in
   let n = Array.length p.smeths in
