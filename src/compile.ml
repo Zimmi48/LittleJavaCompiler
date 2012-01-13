@@ -490,9 +490,32 @@ let compile_program p ofile =
        Jal "print";
        Li (V0, 17); (* on termine avec un code d'erreur *)
        Li (A0, 1);
-       Syscall
+       Syscall;
+(*
+       Label "String_equals"; (* implémentation de String.equals *)
+       (* this et l'argument à comparer sont sur la pile *)
+       Lw (A0, Areg(4, SP)) ;
+       Lw (A1, Areg(8, SP)) ;
+       (* si les pointeurs sont les mêmes, a fortiori c'est la même chaîne *)
+       Beq (A0, A1, "String_equals_true") ;
+       (* si l'un seulement est NULL *)
+       Beqz (A0, "String_equals_false") ;
+       Beqz (A1, "String_equals_false") ;
+       (* sinon on compare les chaînes caractère par caractère *)
+       Lw (A0, Areg(4, A0)) ; (* chargement des adresse des chaînes *)
+       Lw (A1, Areg(4, A1)) ;
+       
+       Beqz (
 
-      (* rajouter les implémentations de String_equals, concat, String_ofint *)
+       Label "String_equals_false" ;
+       Li (V0, 0) ;
+       Jr RA ;
+       
+       Label "String_equals_true" ;
+       Li (V0, 1) ;
+       Jr RA
+*)
+      (* rajouter les implémentations de concat et String_ofint *)
       ] in
   let n = Array.length p.smeths in
   for i = 0 to n - 1 do
