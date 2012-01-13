@@ -283,10 +283,15 @@ module ClassAnalysis = struct
 	let attrs = checkAttr classes cl in
 	let md,meths,mdescriptor = checkMethods classes meths md lastId cl in
 	let cd,meths,cdescriptor = checkConst classes meths cl lastId cd  in 
+	let ext = match cl.class_extends with
+	  | None -> None
+	  | Some("Object",p) -> None
+	  | foo -> foo
+	in
 	let cl = {
 	  oclass_pos = cl.class_pos;
 	  oclass_name = cl.class_name;
-	  oclass_extends = cl.class_extends;
+	  oclass_extends = ext ;
 	  oclass_attrs = attrs;
 	  oclass_methodesdesc = mdescriptor;
 	  oclass_constsdesc = cdescriptor;
@@ -669,13 +674,7 @@ module  CheckInstr = struct
 	| None -> None,(return)
 	| Some i -> (
 	  let _,i,subreturn2 = typInstr classes  return returnType pos c env i in
-	  (* Si on a trouvé un return dans l'une des deux branches mais pas 
-	     au dessus dans la branche courante, il y a un flux d'execution
-	     potentiellement sans retour *)
-	  if (not return ) && (subreturn || subreturn2 ) && ( not (subreturn && subreturn2)) 
-	  then
-	    (raise (EReturn(pos,e.sp))) ;
-	  (Some (i)),(return || subreturn || subreturn2))
+	  (Some (i)),(return || (subreturn && subreturn2)))
       in
       (env,(SIf(e,i1,i2)),return)
     | For(e1,e2,e3,i) -> 
@@ -696,12 +695,15 @@ module  CheckInstr = struct
       in
       (* on considère qu'un return dans un for ne compte pas
 	 il en faut un à l'extèrieur du for, pour être sûr de sa présence,
-	 car on pourrait ne jamais entrer dans le for *)
-      let i = match i with
-	| None -> None
-	| Some f -> let _,i,_ = 
+	 car on pourrait ne jamais entrer dans le for, sauf si e2 est true*)
+      let check = match e2.sv with 
+	| SBconst(true) -> true
+	| _ -> false in
+      let i,return = match i with
+	| None -> None,return
+	| Some f -> let _,i,subreturn = 
 		      typInstr classes return returnType pos c env f in
-		    (Some i)
+		    (Some i),((subreturn && check) || return)
       in
       (env,(SFor(e1,e2,e3,i)),return)
     | Block(li) -> 
