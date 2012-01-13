@@ -547,7 +547,8 @@ let compile_program p ofile =
        Label "String_equals_boucle";
        Bne (A0, A1, "String_equals_false");
        Beqz (A0, "String_equals_true");
-       Arith (Add, SP, SP, Oimm 4);
+       Arith (Add, A0, A0, Oimm 4);
+       Arith (Add, A1, A1, Oimm 4);
        J "String_equals_boucle";
 
        Label "String_equals_false" ;
@@ -563,8 +564,23 @@ let compile_program p ofile =
        Jal "print" ;
        Li (A0, 2) ;
        Li (V0, 17);
-       Syscall
-
+       Syscall;
+(*
+       Label "String_concat" ;
+       Li (T0 , 0) (* on compte la nouvelle longueur *)
+       Lw (A0, Areg(4, A0)) ; (* chargement des adresse des chaînes *)
+       Lw (A1, Areg(4, A1)) ;
+       
+       Label "String_concat_boucle1";
+       Arith (Add, T0, T0, Oimm 4);
+       Arith (Add, A0, A0, Oimm 4);
+       J "String_concat_boucle1";
+       
+       Label "String_concat_boucle2";
+       Arith (Add, T0, T0, Oimm 4);
+       Arith (Add, A1, A1, Oimm 4);
+       J "String_concat_boucle2";
+*)     
       (* rajouter les implémentations de concat et String_ofint *)
       ] in
   let n = Array.length p.smeths in
