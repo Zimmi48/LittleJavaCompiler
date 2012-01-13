@@ -25,7 +25,9 @@
     "void", VOID;
     "Main", CLASS_MAIN; (* faux keywords *)
     "main", MAIN;
-    "System.out.print", PRINT]
+    "System", SYSTEM;
+    "out", OUT;
+    "print", PRINT]
   let id_or_kwd s = try List.assoc s kwd_tbl with _ -> IDENT s
 
   let newline lexbuf =

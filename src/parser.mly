@@ -35,7 +35,7 @@
 %token <string> IDENT
 %token BOOLEAN, CLASS, ELSE, EXTENDS, FALSE, FOR, IF, INSTANCEOF, INT, NEW, NULL, PUBLIC, RETURN, STATIC, THIS, TRUE, VOID
 %token CLASS_MAIN MAIN LBRACKET RBRACKET
-%token PRINT
+%token SYSTEM OUT PRINT
 %token EOF 
 %token EQ
 %token LP RP (* parenthèses *)
@@ -186,7 +186,8 @@ expr:
     { Instanceof (position $startpos $endpos , e , t) }
 | NEW id = IDENT LP l = separated_list(COMMA, expr) RP
     { New (position $startpos $endpos , id , l) }
-| PRINT LP e = expr RP { Print (position $startpos $endpos, e) }
+| SYSTEM DOT OUT DOT PRINT LP e = expr RP
+    { Print (position $startpos $endpos, e) }
 | LP e = expr RP %prec atome { e }
 
 %inline opInfix:
