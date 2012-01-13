@@ -179,7 +179,11 @@ let compile_program p ofile =
                     :: Arith (Sub, SP, SP, Oimm 4)
                     :: Jal "String_equals"
                     :: Arith (Add, SP, SP, Oimm 8) (* libère la pile *)
-                    :: acc
+                    ::
+                      if op = Eq then
+                        acc
+                      else (* on passe au not *)
+                        Arith (Mips.Eq, V0, V0, Oimm 0) :: acc
                   else failwith "Not implemented"
                 (* rajouter les comparaisons entre objets != string
                    et la concaténation de chaînes *)
