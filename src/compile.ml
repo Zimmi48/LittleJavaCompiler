@@ -475,7 +475,7 @@ let compile_program p ofile =
 
   let methodes = ref
       [Label "print"; (* implémentation de print *)
-       Li (V0, 1);
+       Li (V0, 4);
        Syscall;
        Jr RA;
 
@@ -565,7 +565,7 @@ let compile_program p ofile =
     let n = Array.length classe.sclass_methods in
     for i = n - 1 downto 0 do
       methodes := AWord ("debut_meth_" ^ soi classe.sclass_methods.(i) )
-        :: !methodes
+      :: !methodes
     done;
     let constructeurs = ref [] in
     let n = Array.length classe.sclass_consts in
