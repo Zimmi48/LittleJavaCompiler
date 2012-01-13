@@ -291,6 +291,7 @@ let compile_program p ofile =
       end
     | SPrint e -> (* prend en argument un objet de type String *)
       let label = "print_preparation_" ^ soi !print_preparation_nb in
+      incr print_preparation_nb;
       compile_expr e env (
         Bnez (V0, label)
         (* sinon la chaîne pointe sur NULL, on lève une erreur *)
@@ -494,7 +495,7 @@ let compile_program p ofile =
        Label "instanceof_true";
        Li (V0, 1);
        Jr RA;
-       Label "instance_of_false";
+       Label "instanceof_false";
        Li (V0, 0);
        Jr RA;
 
@@ -560,12 +561,7 @@ let compile_program p ofile =
   (** compilation des classes : crée un descripteur à placer dans le tas
       suivi de acc *)
   let compile_classe name classe acc =
-    let methodes = ref [
-      DLabel "descr_general_String"; (* description de String , à part *)
-      Word 0; (* hérite de Object *)
-      DLabel "descr_meth_String";
-      AWord ("String_equals") (* seule méthode de String disponible *)
-    ] in
+    let methodes = ref [] in
     let n = Array.length classe.sclass_methods in
     for i = n - 1 downto 0 do
       methodes := AWord ("debut_meth_" ^ soi classe.sclass_methods.(i) )
@@ -586,10 +582,15 @@ let compile_program p ofile =
       !constructeurs @
       DLabel ("descr_meth_" ^ name) ::
       !methodes
+      @ acc
   in
-     
 
-  let classes = Cmap.fold compile_classe p.sclasses [] in
+  let classes = Cmap.fold compile_classe p.sclasses [
+    DLabel "descr_general_String"; (* description de String , à part *)
+    Word 0; (* hérite de Object *)
+    DLabel "descr_meth_String";
+    AWord ("String_equals") (* seule méthode de String disponible *)
+  ] in
 
   let p = { text = main @ !methodes ; data = !data @ classes } in
   let f = open_out ofile in

@@ -1,6 +1,6 @@
 class A {
 	A () {
-		System.out.print("Création de a\n");
+		System.out.print("Creation de a\n");
 	}
 	int a ;
 }
