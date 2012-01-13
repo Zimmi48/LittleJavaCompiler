@@ -248,7 +248,8 @@ module ClassAnalysis = struct
       
       
   (** parcourt la map des classes, vérifie que l'héritage est sans cycle, et type les classes *)
-  let checkHerit prog classes hMap = 
+  let checkHerit prog=
+    let classes,hMap = buildClassMap prog in
     let lastId = ref 0 in
     let rec dfsVisit  md cd blackSet (accMap,meths) (c,pos)=
       if Cset.mem c blackSet then

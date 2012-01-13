@@ -3,6 +3,7 @@
 
 open Format
 open Lexing
+open TypeClass 
 
 (* Option de compilation, pour s'arrêter à l'issue du parser *)
 let parse_only = ref false
@@ -82,7 +83,8 @@ let () =
     if !parse_only then exit 0;
     
     (* Typage *)
-(*    let p = Type.type_program p in*)
+    let p = checkHerit p in
+    let p = typProg p in 
     
     (* On s'arrête ici si on ne veut faire que le typage *)
     if !type_only then exit 0;
