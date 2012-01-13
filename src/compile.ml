@@ -237,7 +237,7 @@ let compile_program p ofile =
           args
           (La (T0, label_descripteur)
            :: Lw (T0, Areg(4 * i, T0) )
-           :: Jalr (T0, RA)
+           :: Jalr T0
            :: Arith(Add, SP, SP, Oimm ((List.length args + 1) * 4))
            (* désalloue la place qu'occupaient les arguments *)
            :: acc) )
@@ -289,7 +289,7 @@ let compile_program p ofile =
                   args
                   (La (T0, "descr_general_" ^ name)
                    :: Lw (T0, Areg(4 * (i + 1), T0) )
-                   :: Jalr (T0, RA)
+                   :: Jalr T0
                    (* désalloue la place qu'occupaient les arguments *)
                    :: Arith(Add, SP, SP, Oimm ((List.length args + 1) * 4))
                    (* récupère la valeur de l'objet *)
@@ -472,12 +472,12 @@ let compile_program p ofile =
         [Label label_retour]
     in
     Label label_debut ::
-      Move(FP, SP) :: (* initialise FP *)
+      Arith(Sub, FP, SP, Oimm 4) :: (* initialise FP *)
       Sw (RA, Areg(0, FP)) :: (* sauvegarde RA *)
       Arith (Add, SP, FP, Oimm frame_size) :: (* Alloue la frame *)
       body @
       [Arith (Add, SP, SP, Oimm (-frame_size)); (* désalloue la frame *)
-       Lw (RA, Areg(0, SP)); (* récupère la valeur de RA *)
+       Lw (RA, Areg(0, FP)); (* récupère la valeur de RA *)
        Jr RA]
   in
 

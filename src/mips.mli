@@ -25,7 +25,7 @@ type instruction =
   | Neg of register * register
   | Jal of string
   | Jr of register
-  | Jalr of register * register
+  | Jalr of register
   | J of string
   | Beq of register * register * string
   | Bne of register * register * string

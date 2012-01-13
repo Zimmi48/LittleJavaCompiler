@@ -25,7 +25,7 @@ type instruction =
   | Neg of register * register
   | Jal of string
   | Jr of register
-  | Jalr of register * register
+  | Jalr of register
   | J of string
   | Beq of register * register * string
   | Bne of register * register * string
@@ -99,8 +99,8 @@ let print_instruction fmt = function
     fprintf fmt "\tjal  %s\n" s
   | Jr r ->
     fprintf fmt "\tjr   %a\n" print_register r
-  | Jalr (r1, r2) ->
-    fprintf fmt "\tjalr   %a, %a\n" print_register r1 print_register r2
+  | Jalr r ->
+    fprintf fmt "\tjalr   %a\n" print_register r
   | J s ->
     fprintf fmt "\tj  %s\n" s
   | Beq (r1, r2, s) ->
