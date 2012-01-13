@@ -347,22 +347,23 @@ module  CheckInstr = struct
 	| None -> if c2.oclass_name = "Object" then true else false
 	| Some (extends,_) ->
           if c2.oclass_name = extends then true
-          else
-            match c2.oclass_extends with
-              | None -> false
-	      | Some (c,_) -> isSubClass classes c1 (Cmap.find c classes)
+          else 
+	      isSubClass classes (Cmap.find extends classes) c2
     )
 
   exception Nf of string 
       
   (** calcul si t1 est un sous type de t2 *)
-  let isSubType classes t1 t2 = 
+  let isSubType classes t1 t2 =
     match t1,t2 with
       | STypeNull,_ -> true
       | SBool,_ | SInt,_ -> (t1 = t2)
+      | (SC i1),(SC i2) when i1 = i2 -> true
+      | (SC "Object"),_ -> false
+      | (SC i),(SC "Object") -> true	
       | (SC "String"),_ -> false
       | _,(SC "String") -> false
-      | (SC i1),(SC i2) -> 
+      | (SC i1),(SC i2) ->
 	let c1 = try 
 		   (Cmap.find i1 classes)
 	  with Not_found -> (raise (Nf i1))
@@ -513,7 +514,7 @@ module  CheckInstr = struct
       begin
 	match op with 
 	  | Eq | Neq -> 
-	    if (isSubType classes e1.st e2.st)or (isSubType classes e2.st e1.st) then
+	    if (isSubType classes e1.st e2.st) || (isSubType classes e2.st e1.st) then
 	      { sv = SBinaire(op,e1,e2); sp = p; st = SBool }
 	    else
 	    (raise (WrongType(e2.sp,e2.st,None)))
@@ -623,7 +624,7 @@ module  CheckInstr = struct
       let t = types_to_Sast t in
       if 
 	try 
-	  ((isSubType classes t e.st) && (isSubType classes e.st t) )
+	  ((isSubType classes t e.st) || (isSubType classes e.st t) )
 	with Nf n-> (raise (Undefined(p,n)))
       then
 	{ sv = SCast(t,e); sp = p; st = t }
@@ -635,7 +636,7 @@ module  CheckInstr = struct
       begin
 	match e.st with 
 	  | SC _ | STypeNull ->  
-	    if ((isSubType classes t e.st) && (isSubType classes e.st t) ) then
+	    if ((isSubType classes t e.st) || (isSubType classes e.st t) ) then
 	      { sv = SInstanceof(e,t); sp = p; st = SBool }
 	    else
 	      (raise (WrongType(e.sp,e.st,None)))
