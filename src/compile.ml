@@ -185,8 +185,39 @@ let compile_program p ofile =
       (* la variable considérée est toujours un mot (4 octets) *)
       compile_vars var env (
         Lw (V0, Areg (0, V0)) :: acc )
-(*    | SNew (name, constr, args) ->*)
-      
+    | SNew (name, constr, args) ->
+      begin
+        try
+          (* alloc dynamique *)
+          Li (V0, 9)
+          :: Li (A0, (Cmap.cardinal (Cmap.find name !classe_attrs) + 1) * 4)
+          :: Syscall
+          :: La(T0, "descr_general_" ^ name)
+          :: Sw(T0, Areg(0, V0) )
+          :: begin
+            match constr with
+                None -> acc
+              | Some i ->
+                (* appel du constructeur *)
+                (* enregistre la valeur de l'objet sur la pile *)
+                Sw (V0, Areg (0, SP))
+                :: Arith (Sub, SP, SP, Oimm 4)
+                (* évalue les arguments de gauche à droite *)
+                :: List.fold_right
+                  (fun expr acc -> compile_expr expr env
+                    (Arith (Sub, SP, SP, Oimm 4) :: acc) )
+                  args
+                  (La (T0, "descr_general_" ^ name)
+                   :: Lw (T0, Areg(4 * (i + 1), T0) )
+                   :: Jalr (T0, RA)
+                   (* désalloue la place qu'occupaient les arguments *)
+                   :: Arith(Add, SP, SP, Oimm ((List.length args + 1) * 4))
+                   (* récupère la valeur de l'objet *)
+                   :: Lw (V0, Areg(0, SP) )
+                   :: acc)
+          end
+        with _ -> failwith "Compilation de New"
+      end
     | SPrint e ->
       compile_expr e env (
         Move (A0, V0) ::
@@ -390,7 +421,7 @@ let compile_program p ofile =
     DLabel ("descr_general_" ^ name) ::
       begin (* la classe parent *)
         match classe.sclass_extends with
-            Some s -> AWord ("descr_" ^ s.id_id)
+            Some s -> AWord ("descr_general_" ^ s.id_id)
           | None -> Word 0
       end ::
       !constructeurs @
