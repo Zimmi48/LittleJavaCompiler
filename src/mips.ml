@@ -63,7 +63,7 @@ let print_arith fmt = function
   | Sub -> pp_print_string fmt "sub"
   | Mul -> pp_print_string fmt "mul"
   | Div -> pp_print_string fmt "div"
-  | Mod -> failwith "Not implemented"
+  | Mod -> pp_print_string fmt "rem"
   | Eq -> pp_print_string fmt "seq"
   | Neq -> pp_print_string fmt "sne"
   | Leq -> pp_print_string fmt "sle"

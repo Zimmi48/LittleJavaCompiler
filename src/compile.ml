@@ -195,8 +195,7 @@ let compile_program p ofile =
                     :: Arith (Mips.Neq, V0, V0, Oreg T0) (* égalité physique *)
                     :: acc
                   else failwith "Not implemented"
-                (* rajouter les comparaisons entre objets != string
-                   et la concaténation de chaînes *)
+                (* rajouter la concaténation de chaînes *)
                 end ) )
     | SCast (typ, e) ->
       compile_expr e env (
