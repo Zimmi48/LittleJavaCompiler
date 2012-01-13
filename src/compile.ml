@@ -44,6 +44,8 @@ let compile_program p ofile =
   let data = ref [
     DLabel "cast_failure" ;
     Asciiz "Cast failure" ;
+    DLabel "print_failure" ;
+    Asciiz "Erreur : la chaine passee en argument est un pointeur egal a NULL";
     DLabel "null" ;
     Word 0] (* l'adresse de NULL *)
   in
@@ -280,8 +282,17 @@ let compile_program p ofile =
       end
     | SPrint e -> (* prend en argument un objet de type String *)
       compile_expr e env (
-        Lw (A0, Areg(4, V0)) (* récupère l'adresse de la chaîne de caractères *)
-        (* rajouter une erreur en cas de pointeur nul ?? *)
+        Bnez (V0, "print_preparation")
+        (* sinon la chaîne pointe sur NULL, on lève une erreur *)
+        :: La (A0, "print_failure") (* on affiche l'erreur *)
+        :: Jal "print"
+        :: Li (V0, 17) (* on termine avec un code d'erreur *)
+        :: Li (A0, 1)
+        :: Syscall
+          
+        :: Label "print_preparation"
+        (* récupère l'adresse de la chaîne de caractères *)
+        :: Lw (A0, Areg(4, V0))
         :: Jal "print" :: acc )
   in
 
