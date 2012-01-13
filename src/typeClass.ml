@@ -636,7 +636,7 @@ module  CheckInstr = struct
       let i = match i with
 	| None -> None
 	| Some f -> let _,i,_ = 
-		      typInstr classes return returnType pos  c env f in
+		      typInstr classes return returnType pos c env f in
 		    (Some i)
       in
       (env,(SFor(e1,e2,e3,i)),return)
@@ -662,16 +662,79 @@ module  CheckInstr = struct
 	  Some exp)
       in
       (env,(SReturn(e)),true)
-(*	
+	
   (** type un programme Oast vers un programme Sast *)
-  let typProg prog = 
-    let atomic c = 
+  let typProg prog =
+    let meths = Array.make (Array.length prog.omeths) 
+      {  scall_returnType = SVoid;
+	 scall_params = [];
+	 scall_body = SBlock([]);
+      }
+    in
+    let atomic n c accMap = 
       let env,attrMap = Cmap.fold 
 	(fun n v (e,a) ->
-	  (Cmap.add n (types_to_Sast v.v_type) e),(Cmap.add n { id_id = n; id_typ = types_to_Sast v.v_type})) c.oclass_attrs (Cmap.empty,Cmap.empty) in
+	  (Cmap.add n (types_to_Sast v.v_type) e),(Cmap.add n { id_id = n; id_typ = types_to_Sast v.v_type} a)
+	) c.oclass_attrs (Cmap.empty,Cmap.empty) in
       let env = Cmap.add "this" (SC c.oclass_name) env in
       (* typage d'un callable *)
-      let tCall call =
-	let env =
-*)
+      let tCall call returnType pos =
+	let lenv,params = List.fold_left (fun (accEnv,accList) elt ->
+	  let t = types_to_Sast elt.v_type in
+	  (Cmap.add elt.v_name t accEnv),({id_id =elt.v_name;id_typ =t}::accList)
+	) (env,[]) call.ocall_params in
+	let _,instr,return = typInstr prog.oclasses false returnType pos c lenv call.ocall_body in
+	if not return then (raise (EReturn(pos,pos)));
+	{scall_returnType = returnType;
+	 scall_params = params;
+	 scall_body = instr; }
+      in
+      let mDescriptor = Array.make (Array.length c.oclass_methodesdesc) 0 in
+      Array.iter (fun elt -> 
+	mDescriptor.(elt.osimple_n) <- elt.osimple_id;
+	let call = prog.omeths.(elt.osimple_id) in
+	let call = tCall call (types_to_Sast elt.osimple_returnType) elt.osimple_pos in
+	meths.(elt.osimple_id) <- call;
+      ) c.oclass_methodesdesc ;
+      let cDescriptor = Array.make (Array.length c.oclass_constsdesc) 0 in
+      Array.iter (fun elt -> 
+	cDescriptor.(elt.osimple_n) <- elt.osimple_id;
+	let call = prog.omeths.(elt.osimple_id) in
+	let call = tCall call SVoid elt.osimple_pos in
+	meths.(elt.osimple_id) <- call;
+      ) c.oclass_constsdesc ;
+      let ext = match c.oclass_extends with
+	| None -> None
+	| Some foo -> Some (fst foo) in
+      let nClass = {
+	sclass_pos = c.oclass_pos;
+	sclass_name = n;
+	sclass_extends = ext;
+	sclass_attrs = attrMap;
+	sclass_consts = cDescriptor;
+	sclass_methods = mDescriptor;
+      }
+      in
+      Cmap.add n nClass accMap
+    in
+    let classes = Cmap.fold atomic prog.oclasses Cmap.empty in
+    (* on crée une classe artificielle *)
+    let classMain = {
+      oclass_pos = ClassAnalysis.emptyPos;
+      oclass_name = "Main";
+      oclass_extends = None;
+      oclass_attrs = Cmap.empty;
+      oclass_methodesdesc = [||];
+      oclass_constsdesc = [||];
+    } in
+    let env = Cmap.add "this" (SC "Main") Cmap.empty in
+    let _,instr,return = typInstr (Cmap.add "Main" classMain prog.oclasses) false SVoid ClassAnalysis.emptyPos classMain env prog.oinstr in
+    if not return then (raise (EReturn(ClassAnalysis.emptyPos,ClassAnalysis.emptyPos)));
+    { sclasses = classes;
+      smeths = meths;
+      sinstr = instr; 
+    }
+
 end
+	  
+  

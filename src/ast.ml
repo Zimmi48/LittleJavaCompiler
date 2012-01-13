@@ -270,7 +270,7 @@ module Sast = struct
     (** Le nom de la classe*)
     sclass_name : string ;
     (** Liste des relations d'héritages *)
-    sclass_extends : sident option;
+    sclass_extends : string option;
     (** Les attributs *)
     sclass_attrs : sident Cmap.t;
     (** les constructeurs (ils peuvent être surchargés), le champ returnType est toujours nul*)
