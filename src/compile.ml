@@ -47,6 +47,8 @@ let compile_program p ofile =
     Asciiz "Cast failure" ;
     DLabel "print_failure" ;
     Asciiz "Erreur : la chaine passee en argument est un pointeur egal a NULL";
+    DLabel "division_by_zero_failure" ;
+    Asciiz "Division by zero failure" ;
     DLabel "null" ;
     Word 0] (* l'adresse de NULL *)
   in
@@ -144,6 +146,13 @@ let compile_program p ofile =
             compile_expr e2 env ( (* compile e2 et laisse dans V0 *)
                 begin
                   if e1.st = SInt & e2.st = SInt then
+                    begin
+                      if op = Div then
+                        function acc ->
+                          Beqz (V0, "throw_division_by_zero_failure")
+                          :: acc
+                      else function acc -> acc
+                    end (
                     Arith (Add, SP, SP, Oimm 4)
                     :: Lw (T0, Areg (0, SP)) (* cherche la valeur de e1 *)
                     :: Arith (
@@ -159,7 +168,7 @@ let compile_program p ofile =
                           | _ -> failwith "Typage mal fait"
                       end
                         , V0, T0, Oreg V0 )
-                    :: acc
+                    :: acc )
                   else if e1.st = SBool then (* nécessairement e2.st = SBool *)
                     Arith (Add, SP, SP, Oimm 4)
                     :: Lw (T0, Areg (0, SP)) (* cherche la valeur de e1 *)
@@ -298,7 +307,7 @@ let compile_program p ofile =
         :: La (A0, "print_failure") (* on affiche l'erreur *)
         :: Jal "print"
         :: Li (V0, 17) (* on termine avec un code d'erreur *)
-        :: Li (A0, 1)
+        :: Li (A0, 2)
         :: Syscall
           
         :: Label label
@@ -519,7 +528,7 @@ let compile_program p ofile =
        La (A0, "cast_failure"); (* on affiche l'erreur *)
        Jal "print";
        Li (V0, 17); (* on termine avec un code d'erreur *)
-       Li (A0, 1);
+       Li (A0, 2);
        Syscall;
 
        Label "String_equals"; (* implémentation de String.equals *)
@@ -547,7 +556,14 @@ let compile_program p ofile =
        
        Label "String_equals_true" ;
        Li (V0, 1) ;
-       Jr RA
+       Jr RA ;
+
+       Label "throw_division_by_zero_failure" ;
+       La (A0, "division_by_zero_failure") ;
+       Jal "print" ;
+       Li (A0, 2) ;
+       Li (V0, 17);
+       Syscall
 
       (* rajouter les implémentations de concat et String_ofint *)
       ] in
