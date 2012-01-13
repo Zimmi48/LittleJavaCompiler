@@ -175,8 +175,8 @@ module ClassAnalysis = struct
     let bDesc (accList,accMeths) const = 
       (* on vérifie que les profils sont bien formés *)
       let _ = isBFCall classes const in
-    (* on vérifie que tout les constructeurs ont le même nom *)
-      if const.call_name != c.class_name then
+      (* on vérifie que tout les constructeurs ont le même nom *)
+      if (String.compare const.call_name c.class_name) != 0 then 
 	(raise (BadConst(const.call_pos,const.call_name,c.class_name)));
       let _ = isBFCall classes const in
       let s = {
@@ -184,11 +184,13 @@ module ClassAnalysis = struct
 	osimple_returnType = Void;
 	osimple_name = const.call_name;
 	osimple_params = const.call_params;
-	osimple_id = (incr lastId; !lastId);
-	osimple_n = (incr size; !size);
+	osimple_id = ( !lastId);
+	osimple_n = ( !size);
 	osimple_classe = c.class_name;
       } 
       in
+      incr lastId;
+      incr size;
       let o = {
 	ocall_params = const.call_params;
 	ocall_body = const.call_body;
@@ -215,14 +217,15 @@ module ClassAnalysis = struct
       let _ = isBFCall classes m in
       let s = { 
 	osimple_pos = m.call_pos;
-	osimple_id = ( incr lastId ; !lastId);
-	osimple_n = ( incr size ; !size);
+	osimple_id = ( !lastId);
+	osimple_n = ( !size);
 	osimple_params = m.call_params;
 	osimple_classe = c.class_name;
 	osimple_name = m.call_name;
 	osimple_returnType = m.call_returnType ;
       }
       in
+      incr lastId ; incr size ;
       let o = {
 	ocall_params = m.call_params;
 	ocall_body = m.call_body;
