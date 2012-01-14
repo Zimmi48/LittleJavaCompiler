@@ -175,7 +175,7 @@ let () =
       eprintf "Erreur du compilateur : %s \n" s ;
       exit 2 ;
     | _ -> 
-      eprintf "Erreur du compilateur \n" s ;
+      eprintf "Erreur du compilateur \n";
       exit 2;
       
       
