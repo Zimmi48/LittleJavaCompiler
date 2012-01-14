@@ -147,11 +147,7 @@ module ClassAnalysis = struct
   (** compare deux profils (liste de variable) *)
   let isDiffProf p1 p2 = 
     try
-      if (0 = (List.length p1)) && (List.length p2) = 0 then
-	false
-      else 
-	List.for_all2 (fun v1 v2 -> v1.v_type <> v2.v_type) p1 p2  
-    with  Invalid_argument _ -> true
+      List.fold_left2 (fun b v1 v2 -> b || (v1.v_type <> v2.v_type)) false p1 p2      with  Invalid_argument _ -> true
       
   (** vérifie que le callable simple a des profils différents de ceux des callables de liste et renvoit la nouvelle liste des callables en tenant compte des redéfinissions *)    
   let diff c liste scall size =
