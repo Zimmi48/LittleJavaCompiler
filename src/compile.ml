@@ -310,7 +310,7 @@ let compile_program p ofile =
                 else
                   attr_zero
                     (pos - 1)
-                    (Sw (Zero, Areg(pos * 4, V0)) :: acc)
+                    (Sw (Zero, Areg((pos + 1) * 4, V0)) :: acc)
               in
               attr_zero n
                 begin match constr with
