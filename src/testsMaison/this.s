@@ -19,7 +19,7 @@ main:
 	jalr   $t0
 	add  $sp, $sp, 8
 	lw   $v0, 0($sp)
-	add  $t0, $fp, -12
+	add  $t0, $fp, -8
 	sw   $v0, 0($t0)
 fin_main:
 	add  $sp, $sp, 12
@@ -27,7 +27,7 @@ fin_main:
 	jr   $ra
 debut_meth_3:
 	sw   $fp, 0($sp)
-	move $fp, $sp
+	sub  $fp, $sp, 4
 	sw   $ra, -4($fp)
 	add  $sp, $fp, -8
 	add  $v0, $fp, 12
@@ -61,7 +61,7 @@ fin_meth_3:
 	jr   $ra
 debut_meth_2:
 	sw   $fp, 0($sp)
-	move $fp, $sp
+	sub  $fp, $sp, 4
 	sw   $ra, -4($fp)
 	add  $sp, $fp, -8
 fin_meth_2:
@@ -72,7 +72,7 @@ fin_meth_2:
 	jr   $ra
 debut_meth_1:
 	sw   $fp, 0($sp)
-	move $fp, $sp
+	sub  $fp, $sp, 4
 	sw   $ra, -4($fp)
 	add  $sp, $fp, -8
 	add  $v0, $fp, 12
@@ -93,7 +93,7 @@ fin_meth_1:
 	jr   $ra
 debut_meth_0:
 	sw   $fp, 0($sp)
-	move $fp, $sp
+	sub  $fp, $sp, 4
 	sw   $ra, -4($fp)
 	add  $sp, $fp, -8
 fin_meth_0:
