@@ -672,10 +672,12 @@ let compile_program p ofile =
        (* première étape : crée une chaîne assez longue *)
        (* 10 chiffres suffisent *)
        (* alloc dynamique : création de la chaîne *)
+       Move(T1,A0);
        Li (V0, 9);
        Li (A0, 11);
        Syscall;
        Move(T0, V0);
+       Move(A0,T1);
 
        Arith (Add, T0, T0, Oimm 9); (* on se place en fin de chaîne *)
        Sb (Zero, Areg(1, T0)); (* la chaîne finit par 0 *)
