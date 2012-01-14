@@ -1,7 +1,7 @@
 (* à partir d'un fichier de J-C. Filliâtre *)
 
 type register = 
-  | A0 | A1 | V0 | T0 | T1 | S0 | RA | SP | FP
+  | Zero | A0 | A1 | V0 | T0 | T1 | T2 | T3 | T4 | S0 | RA | SP | FP
 
 type address =
   | Alab of string
@@ -24,7 +24,11 @@ type instruction =
   | Sb of register * address
   | Arith of arith * register * register * operand
   (* au sens large pour tout type d'opérateur binaire *)
+  | Div2 of register * register
+  | Mflo of register
+  | Mfhi of register
   | Neg of register * register
+  | Abs of register * register
   | Jal of string
   | Jr of register
   | Jalr of register
@@ -50,11 +54,15 @@ type program = {
 open Format
 
 let print_register fmt = function
+  | Zero -> pp_print_string fmt "$0"
   | A0 -> pp_print_string fmt "$a0"
   | A1 -> pp_print_string fmt "$a1"
   | V0 -> pp_print_string fmt "$v0"
   | T0 -> pp_print_string fmt "$t0"
   | T1 -> pp_print_string fmt "$t1"
+  | T2 -> pp_print_string fmt "$t2"
+  | T3 -> pp_print_string fmt "$t3"
+  | T4 -> pp_print_string fmt "$t4"
   | S0 -> pp_print_string fmt "$s0"
   | RA -> pp_print_string fmt "$ra"
   | SP -> pp_print_string fmt "$sp"
@@ -99,8 +107,16 @@ let print_instruction fmt = function
   | Arith (a, dst, src, op) ->
     fprintf fmt "\t%a  %a, %a, %a\n" 
       print_arith a print_register dst print_register src print_operand op
-  | Neg (dst, src) -> fprintf fmt "\tneg   %a, %a\n"
-    print_register dst print_register src
+  | Div2 (r1, r2) ->
+    fprintf fmt "\tdiv   %a, %a\n" print_register r1 print_register r2
+  | Mflo r ->
+    fprintf fmt "\tmflo   %a\n" print_register r
+  | Mfhi r ->
+    fprintf fmt "\tmfhi   %a\n" print_register r
+  | Neg (dst, src) ->
+    fprintf fmt "\tneg   %a, %a\n" print_register dst print_register src
+  | Abs (dst, src) ->
+    fprintf fmt "\tabs   %a, %a\n" print_register dst print_register src
   | Jal s ->
     fprintf fmt "\tjal  %s\n" s
   | Jr r ->

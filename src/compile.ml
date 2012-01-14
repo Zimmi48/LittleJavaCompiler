@@ -201,7 +201,28 @@ let compile_program p ofile =
                     :: Move (A1, V0)
                     :: Jal "String_concat"
                     :: acc
-                  else failwith "String of int not implemented"
+                  else if op = Plus & e1.st = SInt & e2.st = SC "String"
+                  then
+                    Arith (Add, SP, SP, Oimm 4)
+                    :: Lw (A0, Areg (0, SP)) (* cherche la valeur de e1 *)
+                    :: Sw (V0, Areg (0, SP)) (* stocke celle de e2 *)
+                    :: Arith (Sub, SP, SP, Oimm 4)
+                    :: Jal "String_ofint" (* convertit *)
+                    :: Move (A0, V0)
+                    :: Arith (Add, SP, SP, Oimm 4)
+                    :: Lw (A1, Areg (0, SP)) (* charge la valeur de e2 *)
+                    :: Jal "String_concat"
+                    :: acc
+                  else if op = Plus & e1.st = SC "String" & e2.st = SInt
+                  then
+                    Move (A0, V0)
+                    :: Jal "String_ofint" (* convertit e2 *)
+                    :: Arith (Add, SP, SP, Oimm 4)
+                    :: Lw (A0, Areg (0, SP)) (* cherche la valeur de e1 *)
+                    :: Move (A1, V0)
+                    :: Jal "String_concat"
+                    :: acc
+                  else failwith "Typage mal fait"
                 end ) )
     | SCast (typ, e) ->
       compile_expr e env (
@@ -573,6 +594,7 @@ let compile_program p ofile =
        Syscall;
 
        Label "String_concat" ; (* implémentation de la concaténation *)
+       (* prend deux objets String dans A0 et A1 *)
        Li (T0 , 1); (* on compte la nouvelle longueur *)
        (* ne lève pas d'erreur si on essaye la concaténation avec NULL *)
        Lw (A0, Areg(4, A0)) ; (* chargement des adresses des chaînes *)
@@ -639,8 +661,56 @@ let compile_program p ofile =
       
        La(T0, "descr_general_String");
        Sw (T0, Areg(0, V0) );
+       Jr RA;
+
+       Label "String_ofint"; (* implémentation de la conversion int -> string *)
+       (* l'argument doit être dans A0 *)
+       (* première étape : crée une chaîne assez longue *)
+       (* 10 chiffres suffisent *)
+       (* alloc dynamique : création de la chaîne *)
+       Li (V0, 9);
+       Li (A0, 11);
+       Syscall;
+       Move(T0, V0);
+
+       Arith (Add, T0, T0, Oimm 10); (* on se place en fin de chaîne *)
+       Sb (Zero, Areg(1, T0)); (* la chaîne finit par 0 *)
+
+       (* détermine l'écriture décimale et l'enregistre dans la chaîne *)
+       Li (T1, int_of_char '0');
+       Sb (T1, Areg(0, T0)); (* initialise à zéro *)
+       Arith (Mips.Lt, T2, A0, Oimm 0); (* garde le signe *)
+       Li (T3, 10); (* précharge 10 *)
+       Beqz (A0, "String_ofint_end");
+       Abs (A0, A0);
+       
+       Label "String_ofint_boucle";
+       Div2 (A0, T3);
+       Mflo A0; (* a = a / 10 *)
+       Mfhi T4; (* récupère le reste *)
+       Arith (Add, T4, T4, Oreg T1); (* convertit en ascii *)
+       Sb (T4, Areg(0, T0)); (* place dans la chaîne *)
+       Arith (Sub, T0, T0, Oimm 1); (* se place à la position précédente *)
+       Bnez (A0, "String_ofint_boucle");
+       Arith (Add, T0, T0, Oimm 1); (* se replace au début du nombre *)
+
+       Label "Stringof_int_end";
+       Beqz (T2, "String_ofint_retour");
+       Arith (Sub, T0, T0, Oimm 1); (* si le signe était négatif *)
+       Li (T1, int_of_char '-');
+       Sb (T1, Areg(0, T0));
+
+       (* dernière étape création de l'objet String *)
+       Label "String_ofint_retour";
+       Li (V0, 9);
+       Li (A0, 8);
+       Syscall;
+       La(T1, "descr_general_String");
+       Sw (T1, Areg(0, V0) );
+
+      (* place l'adresse de la chaine dans le champ correspondant *)
+       Sw (T0, Areg(4, V0));
        Jr RA
-      (* rajouter les implémentations de concat et String_ofint *)
       ] in
   let n = Array.length p.smeths in
   for i = 0 to n - 1 do

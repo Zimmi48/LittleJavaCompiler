@@ -1,7 +1,7 @@
 (* à partir d'un fichier de J-C. Filliâtre *)
 
 type register = 
-  | A0 | A1 | V0 | T0 | T1 | S0 | RA | SP | FP
+  | Zero | A0 | A1 | V0 | T0 | T1 | T2 | T3 | T4 | S0 | RA | SP | FP
 
 type address =
   | Alab of string
@@ -24,7 +24,11 @@ type instruction =
   | Sb of register * address
   | Arith of arith * register * register * operand
   (* au sens large pour tout type d'opérateur binaire *)
+  | Div2 of register * register
+  | Mflo of register
+  | Mfhi of register
   | Neg of register * register
+  | Abs of register * register
   | Jal of string
   | Jr of register
   | Jalr of register
