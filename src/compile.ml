@@ -238,7 +238,7 @@ let compile_program p ofile =
           (* évalue les arguments de gauche à droite *)
           List.fold_right
           (fun expr acc -> compile_expr expr env
-            (Arith (Sub, SP, SP, Oimm 4) :: acc) )
+            (Sw (V0, Areg (0, SP)) :: Arith (Sub, SP, SP, Oimm 4) :: acc) )
           args
           (La (T0, label_descripteur)
            :: Lw (T0, Areg(4 * i, T0) )
@@ -290,7 +290,8 @@ let compile_program p ofile =
                 (* évalue les arguments de gauche à droite *)
                 :: List.fold_right
                   (fun expr acc -> compile_expr expr env
-                    (Arith (Sub, SP, SP, Oimm 4) :: acc) )
+                    (Sw (V0, Areg (0, SP))
+                     :: Arith (Sub, SP, SP, Oimm 4) :: acc) )
                   args
                   (La (T0, "descr_general_" ^ name)
                    :: Lw (T0, Areg(4 * (i + 1), T0) )
