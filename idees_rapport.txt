@@ -2,3 +2,16 @@ Avec la méthode adoptée pour System.out.print, cette écriture est
 obligatoire. On n'a pas le droit à ((((System)))).out.print. On a jugé que
 ce n'était pas grave, vu que de toute façon cette "méthode statique" est
 parachutée.
+
+
+Les cast m'ont permis de comprendre que je pouvais utiliser mes propres
+erreurs dans le parser.
+
+c'est lorsqu'on passe à une phase suivante qu'on se rend compte que la
+précédente ne va pas.
+
+les accumulateurs dans compile étaient une mauvaise idée.
+
+ne marche pas avec les accents
+
+pas de test pour NULL.a
