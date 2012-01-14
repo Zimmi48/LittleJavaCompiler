@@ -96,7 +96,7 @@ let compile_program p ofile =
       :: Li (A0, 8)
       :: Syscall
       :: La(T0, "descr_general_String")
-      :: Sw(T0, Areg(0, V0) )
+      :: Sw (T0, Areg(0, V0) )
       :: La (T0 , adresse)
       (* place l'adresse de la chaine dans le champ correspondant *)
       :: Sw (T0, Areg(4, V0))
@@ -278,7 +278,7 @@ let compile_program p ofile =
           :: Li (A0, (Cmap.cardinal (Cmap.find name !classe_attrs) + 1) * 4)
           :: Syscall
           :: La(T0, "descr_general_" ^ name)
-          :: Sw(T0, Areg(0, V0) )
+          :: Sw (T0, Areg(0, V0) )
           :: begin
             match constr with
                 None -> acc
@@ -638,7 +638,7 @@ let compile_program p ofile =
        Sw (T0, Areg(4, V0));
       
        La(T0, "descr_general_String");
-       Sw(T0, Areg(0, V0) );
+       Sw (T0, Areg(0, V0) );
        Jr RA
       (* rajouter les implémentations de concat et String_ofint *)
       ] in
