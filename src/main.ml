@@ -170,8 +170,12 @@ let () =
       eprintf "Erreur : pas de return dans cette branche :\n";
       localisationBis pos2 ;
       exit 1
-	(*
+	
     | Failure s ->
       eprintf "Erreur du compilateur : %s \n" s ;
       exit 2 ;
-	*)
+    | _ -> 
+      eprintf "Erreur du compilateur \n" s ;
+      exit 2;
+      
+      

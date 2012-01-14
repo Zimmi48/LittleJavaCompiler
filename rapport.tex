@@ -1,0 +1,48 @@
+\documentclass{article}
+
+\usepackage[francais]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\title{Réalisation d'un compilateur Petit Java}
+\author{Théo ZIMMERMAN \and Joris GIOVANNANGELI}
+\begin{document}
+\maketitle
+\section{Analyse sémantique et typage}
+
+\textbf{L'analyse sémantique} est réalisée en 3 passes successives sur l'ensemble des classes. L'entrée est l'arbre syntaxique issu du parsage, dont le type est donné par le module \emph{Past}, dans le fichier \emph{ast.ml}.
+
+\paragraph{Première passe}
+\subparagraph*{}
+ Dans un premier temps, une fonction \textbf{buildClassMap} construit une Map des classes depuis la liste des classes issue du parsage, pour s'abstraire des contraintes de positions de la définition dans le fichier. Parallèlement, un graphe de l'héritage est construit, sous la forme d'une Map qui à chaque classe associe la liste des classes qui en héritent. La fonction vérifie que :
+ \begin{itemize} 
+   \item[-] chaque classe est définie une seule fois
+   \item[-] aucune classe n'hérite de \emph{String}
+\end{itemize}
+
+\paragraph{Deuxième passe}
+\subparagraph*{}
+Une deuxième passe est ensuite effectuée par la fonction \textbf{checkHerit} qui parcourt l'arbre représantant la relation d'héritage. Un parcourt en profondeur est utilisé. Cette passe transforme un arbre de syntaxe \emph{Past} en un arbre de syntaxe \emph{Oast} intermédiaire, et réalise de nombreux tests sémantiques :
+\begin{itemize} 
+  \item[-] toute classe hérite d'une classe existante
+  \item[-] absence de cycle dans l'héritage
+  \item[-] toutes les méthodes et les constructeurs ont un profil bien formé, dont chaque argument porte un nom unique
+  \item[-] tout les constructeurs portent bien le nom de la classe
+  \item[-] dans chaque classe, il n'y a qu'une seule méthode et un seul constructeur de même signature
+  \item[-] les champs ont un type bien formé et sont uniques
+\end{itemize}
+En outre, on construit ici ce qui deviendra plus tard les descripteurs de classe. On conserve dans un tableau toutes les méthodes définies par les surclasses, leur profil, et leur type de retour. Une méthode sera donc identifiée par une classe et un index dans ce tableau. On réalise un tableau identique pour les constructeurs. Pour éviter la redondance, les corps des méthodes et des constructeurs sont déplacés dans un tableau global, et identifiés par un entier unique. Cette méthode permet de gérer simplement les redéfinitions et les surcharges. 
+\subparagraph*{}
+Dans un premier temps, je n'avais pas compris que les attribus pouvaient être redéfinis. Chose qu'il a fallu re-implémenter par la suite. En outre, les profils d''arguments sont conservés sous la forme de liste, ce qui implique ordonnée. La première implémentation du teste de sous-typage tenait compte de cet ordre, ce qui impliquait  une différence entre \begin{verbatim}(int a; boolean b)\end{verbatim} et \begin{verbatim}(boolean a; int b)\end{verbatim}. Il a fallu ajouter une relation d'ordre sur les types, et trier les profils avant d'en tester le sous-typage, pour avoir un vrai test de différence sur les signatures. En outre, j'ai perdu beaucoup de temps sur des erreurs assez incompréhensibles qui venaient d'un mauvais usage des opérateurs de comparaison. J'utilisais != au lieu de <>, ce qui levait des exceptions alors même que les valeurs étaient réellement différentes.
+
+\paragraph{Troisième passe}
+\subparagraph*{}
+La troisième passe parcourt les classes et type le corps des méthodes. Il s'agit d'une bête implémentation des règles de typage du sujet. Le point important ici est le choix de la méthode effectivement appelée en fonction du profil des arguments. Pour cela, on construit l'ensemble des méthodes portant le bon nom, et appartement aux surclasses de la classe courante, en parcourant le descripteur de méthodes. Puis, cet ensemble, conservé sous forme de liste, est triée selon la relation de sous-typage. Le minimum est choisi s'il existe. Une méthode est alors transformée en un nom de classe et un entier, représentant sa position dans le descripteur. Un autre point à tester est la présence d'une instruction \emph{return} dans toutes les branches d'exévutions possibles, ce qui est fait lors du typage des instructions. Ce parcour est réalisé par la fonction \textbf{typProg} et par l'ensemble des fonctions du module \textbf{typInstr}. Il renvoit un programme tel que défini dans l'arbre de syntaxe du module \textbf{Sast}.
+
+\subparagraph*{} Un bon nombre de problème a été soulevé par le traitement d'excpetion réservé à \emph{Object} et à \emph{String}. En effet, leur absence dans la Map des classes contraint à prévoir tout les cas où il faut traiter les choses différaments pour ces deux types. Leur traitement particulié a été motivé par le fait qu'il s'agit de classes particulières : 
+\begin{itemize}
+\item[-] \emph{Object} n'hérite de rien
+\item[-] \emph{String} est incodable en Petit Java à cause de l'absence de tableau.
+\end{itemize}
+Toutefois, a posteriori, il semble qu'il aurait été plus souhaitable de les traiter le plus normalement possible. 
+
+\end{document}
