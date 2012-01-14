@@ -701,7 +701,7 @@ let compile_program p ofile =
        Arith (Add, T0, T0, Oimm 1); (* se replace au début du nombre *)
 
        Label "String_ofint_end";
-       Bnez (T2, "String_ofint_retour");
+       Beqz (T2, "String_ofint_retour");
        Arith (Sub, T0, T0, Oimm 1); (* si le signe était négatif *)
        Li (T1, int_of_char '-');
        Sb (T1, Areg(0, T0));
