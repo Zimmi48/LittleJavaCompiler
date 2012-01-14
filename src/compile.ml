@@ -22,11 +22,16 @@ let compile_program p ofile =
         | _ -> Cmap.empty
     end
     in
-    let last_id_nb = ref (Cmap.cardinal attrs - 1) in
+    let last_id_nb = ref ((Cmap.fold  (fun _ l n ->(List.length l) + n )  attrs 0) - 1) in
     let attrs = Cmap.fold
       (fun id_name _ attrs ->
-        incr last_id_nb ;
-        Cmap.add id_name !last_id_nb attrs)
+	let li = 
+	  try 
+	    Cmap.find id_name attrs
+	  with Not_found -> []
+	in
+	incr last_id_nb;
+        Cmap.add id_name ((classe.sclass_name,!last_id_nb)::li) attrs)
       classe.sclass_attrs
       attrs
     in
@@ -76,7 +81,8 @@ let compile_program p ofile =
         match e.st with
           | SC classe ->
             compile_expr e env (
-              let pos = Cmap.find id.id_id (Cmap.find classe !classe_attrs) in
+              let li = Cmap.find id.id_id (Cmap.find classe !classe_attrs) in
+	      let pos = List.assoc classe li in
               let pos = (pos + 1) * 4 in
               Arith (Add, V0, V0, Oimm pos) :: acc )
           | _ -> failwith "Typage mal fait : n'est pas un objet."
@@ -298,14 +304,14 @@ let compile_program p ofile =
           let attr_pos = Cmap.find name !classe_attrs in
           (* alloc dynamique *)
           Li (V0, 9)
-          :: Li (A0, (Cmap.cardinal attr_pos + 1) * 4)
+          :: Li (A0, (Cmap.cardinal attr_pos + 1) * 8)
           :: Syscall
           :: La(T0, "descr_general_" ^ name)
           :: Sw (T0, Areg(0, V0) )
 
           (* inititialisation *)
           :: Cmap.fold
-            (fun _ pos acc -> Sw (Zero, Areg((pos + 1) * 4, V0)) :: acc)
+            (fun _ li acc -> List.fold_left (fun acc1 (_,pos) -> Sw (Zero, Areg((pos + 1) * 4, V0)) :: acc1) acc li)
             attr_pos
             begin match constr with
                 None -> acc
