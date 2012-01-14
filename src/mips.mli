@@ -1,7 +1,7 @@
 (* à partir d'un fichier de J-C. Filliâtre *)
 
 type register = 
-  | Zero | A0 | A1 | V0 | T0 | T1 | T2 | T3 | T4 | S0 | RA | SP | FP
+  | Zero | A0 | A1 | A2 | A3 | V0 | T0 | T1 | T2 | T3 | T4 | S0 | RA | SP | FP
 
 type address =
   | Alab of string

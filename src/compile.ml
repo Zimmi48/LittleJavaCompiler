@@ -576,11 +576,16 @@ let compile_program p ofile =
        Lw (A1, Areg(4, A1)) ;
        
        Label "String_equals_boucle";
-       Bne (A0, A1, "String_equals_false");
-       Beqz (A0, "String_equals_true");
-       Arith (Add, A0, A0, Oimm 4);
-       Arith (Add, A1, A1, Oimm 4);
+       Lb (A2, Areg(0,A0));
+       Lb (A3, Areg(0,A1));
+       Bne (A2, A3, "String_equals_false");
+       Beqz (A2, "String_equals_end");
+       Arith (Add, A0, A0, Oimm 1);
+       Arith (Add, A1, A1, Oimm 1);
        J "String_equals_boucle";
+
+       Label "String_equals_end";
+       Beqz ( A3, "String_equals_true");
 
        Label "String_equals_false" ;
        Li (V0, 0) ;
