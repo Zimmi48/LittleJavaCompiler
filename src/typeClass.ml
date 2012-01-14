@@ -151,8 +151,10 @@ module ClassAnalysis = struct
       
   (** vérifie que le callable simple a des profils différents de ceux des callables de liste et renvoit la nouvelle liste des callables en tenant compte des redéfinissions *)    
   let diff c liste scall size =
+    let scall_params =  List.sort compTyp scall.osimple_params  in
     let atomic (acclist,check) elt =
-      if not (isDiffProf scall.osimple_params elt.osimple_params) then (
+      let elt_params = List.sort compTyp elt.osimple_params in
+      if not (isDiffProf scall_params elt_params) then (
 	if elt.osimple_classe = c.class_name then
 	  (raise (AlreadyDefined(scall.osimple_pos,scall.osimple_name,Some elt.osimple_pos)))
 	else
@@ -189,8 +191,6 @@ module ClassAnalysis = struct
     let bDesc (accList,accMeths) const = 
       (* on vérifie que les profils sont bien formés *)
       let _ = isBFCall classes const in
-      (* on trie les paramètres *)
-      let params = List.sort compTyp const.call_params in
       (* on vérifie que tout les constructeurs ont le même nom *)
       if (String.compare const.call_name c.class_name) <> 0 then 
 	(raise (BadConst(const.call_pos,const.call_name,c.class_name)));
@@ -198,7 +198,7 @@ module ClassAnalysis = struct
 	osimple_pos = const.call_pos;
 	osimple_returnType = Void;
 	osimple_name = const.call_name;
-	osimple_params = params;
+	osimple_params = const.call_params;
 	osimple_id = ( !lastId);
 	osimple_n = ( !size);
 	osimple_classe = c.class_name;
@@ -207,7 +207,7 @@ module ClassAnalysis = struct
       incr lastId;
       incr size;
       let o = {
-	ocall_params = params;
+	ocall_params = const.call_params;
 	ocall_body = const.call_body;
       }
       in
@@ -230,12 +230,11 @@ module ClassAnalysis = struct
     (* construit une map des méthodes *)
     let bMap (accMap,accMeth) m =
       let _ = isBFCall classes m in
-       let params = List.sort compTyp m.call_params in
       let s = { 
 	osimple_pos = m.call_pos;
 	osimple_id = ( !lastId);
 	osimple_n = ( !size2);
-	osimple_params = params;
+	osimple_params = m.call_params;
 	osimple_classe = c.class_name;
 	osimple_name = m.call_name;
 	osimple_returnType = m.call_returnType ;
@@ -243,7 +242,7 @@ module ClassAnalysis = struct
       in
       incr lastId ; incr size2 ;
       let o = {
-	ocall_params = params;
+	ocall_params = m.call_params;
 	ocall_body = m.call_body;
       }
       in
@@ -332,25 +331,6 @@ module  CheckInstr = struct
   open Sast
   open Exceptions
 
-
- (** Ordre sur les types *)
-  let compTyp e1 e2 =
-    match e1.st,e2.st with
-      | t2,t1 when t1 = t2-> 0
-      | SInt,SBool -> -1
-      | SBool,SInt -> 1
-      | STypeNull,SInt -> 1
-      | STypeNull,SBool -> 1
-      | SBool,STypeNull -> -1
-      | SInt,STypeNull -> -1
-      | STypeNull,(SC _) -> -1
-      | (SC foo),STypeNull -> 1
-      | SBool,(SC _) -> -1
-      | SInt,(SC _) -> -1
-      | (SC c1),SBool -> 1
-      | (SC c1),SInt -> 1
-      | (SC c1),(SC c2) -> String.compare c1 c2
-      | (t2,t1) ->  failwith "Improbable"
 
  (** calcule si une classe c1 hérite d'une autre classe c2 *)
   let rec isSubClass classes c1 c2 =
@@ -606,8 +586,6 @@ module  CheckInstr = struct
       else
 	(
 	  let li = List.map (typExpr classes c env) li in
-	  (* on trie le profil *)
-	  let li = List.sort compTyp li in
 	  let meth = findCall classes cl p cl.oclass_methodesdesc m 
 	    (List.map (fun elt -> elt.st) li) 
 	  in
@@ -620,8 +598,6 @@ module  CheckInstr = struct
 	with Not_found -> (raise (Undefined(p,n)))
       in
       let args = List.map (typExpr classes c env) args in
-      (* on trie le profil *)
-      let args = List.sort compTyp args in
       (* S'il n'y a pas de constructeur correspondant ET aucun argument
 	 on considère qu'on utilise aucun constructeur *)
       let constId =
@@ -778,9 +754,7 @@ module  CheckInstr = struct
 	 scall_body = instr; }
       in
       let mDescriptor = Array.make (Array.length c.oclass_methodesdesc) 0 in
-      let foo = ref 0 in
       Array.iter (fun elt ->   
-	(*Printf.printf "%s %s (%d) %d\n" elt.osimple_classe elt.osimple_name elt.osimple_id !foo; incr foo;*)
 	mDescriptor.(elt.osimple_n) <- elt.osimple_id;
 	if elt.osimple_classe = c.oclass_name then (
 	  let call = prog.omeths.(elt.osimple_id) in
