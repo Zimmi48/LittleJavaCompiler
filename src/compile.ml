@@ -229,6 +229,7 @@ let compile_program p ofile =
         match typ with
           | STypeNull -> Bnez (V0, "cast_false") :: acc
           | SInt | SBool -> acc (* rien à faire *)
+          | SC "Object" -> acc
           | SC classe ->
             Move (A0, V0)
             :: La (A1, "descr_general_" ^ classe)

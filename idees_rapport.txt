@@ -15,3 +15,5 @@ les accumulateurs dans compile étaient une mauvaise idée.
 ne marche pas avec les accents
 
 pas de test pour NULL.a
+
+pas de cas à part pour le type Object dans le cast
