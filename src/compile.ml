@@ -102,7 +102,7 @@ let compile_program p ofile =
       :: Sw (T0, Areg(4, V0))
       :: acc
     | SBconst b -> Li (V0, int_of_bool b) :: acc
-    | SNull -> La (V0, "null") :: acc
+    | SNull -> Li (V0, 0) :: acc
     | SNot e -> compile_expr e env (Arith (Mips.Eq, V0, V0, Oimm 0) :: acc)
     | SUMinus e -> compile_expr e env (Neg (V0, V0) :: acc)
     | SPref (op, var) ->
@@ -679,7 +679,7 @@ let compile_program p ofile =
        Syscall;
        Move(T0, V0);
 
-       Arith (Add, T0, T0, Oimm 10); (* on se place en fin de chaîne *)
+       Arith (Add, T0, T0, Oimm 9); (* on se place en fin de chaîne *)
        Sb (Zero, Areg(1, T0)); (* la chaîne finit par 0 *)
 
        (* détermine l'écriture décimale et l'enregistre dans la chaîne *)
@@ -688,7 +688,7 @@ let compile_program p ofile =
        Arith (Mips.Lt, T2, A0, Oimm 0); (* garde le signe *)
        Li (T3, 10); (* précharge 10 *)
        Beqz (A0, "String_ofint_end");
-       Abs (A0, A0);
+       (* Abs (A0, A0); *)
        
        Label "String_ofint_boucle";
        Div2 (A0, T3);
@@ -701,7 +701,7 @@ let compile_program p ofile =
        Arith (Add, T0, T0, Oimm 1); (* se replace au début du nombre *)
 
        Label "String_ofint_end";
-       Beqz (T2, "String_ofint_retour");
+       Bnez (T2, "String_ofint_retour");
        Arith (Sub, T0, T0, Oimm 1); (* si le signe était négatif *)
        Li (T1, int_of_char '-');
        Sb (T1, Areg(0, T0));
