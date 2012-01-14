@@ -296,39 +296,47 @@ let compile_program p ofile =
       else begin
         try
           let attr_pos = Cmap.find name !classe_attrs in
+          let n = Cmap.cardinal attr_pos in
           (* alloc dynamique *)
           Li (V0, 9)
-          :: Li (A0, (Cmap.cardinal attr_pos + 1) * 4)
+          :: Li (A0, (n + 1) * 4)
           :: Syscall
           :: La(T0, "descr_general_" ^ name)
           :: Sw (T0, Areg(0, V0) )
 
           (* inititialisation *)
-          :: Cmap.fold
-            (fun _ pos acc -> Sw (Zero, Areg((pos + 1) * 4, V0)) :: acc)
-            attr_pos
-            begin match constr with
-                None -> acc
-              | Some i ->
+          :: (let rec attr_zero pos acc =
+                if pos = 0 then acc
+                else
+                  attr_zero
+                    (pos - 1)
+                    (Sw (Zero, Areg((pos + 1) * 4, V0)) :: acc)
+              in
+              attr_zero n
+                begin match constr with
+                    None -> acc
+                  | Some i ->
                 (* appel du constructeur *)
                 (* enregistre la valeur de l'objet sur la pile *)
-                Sw (V0, Areg (0, SP))
-                :: Arith (Sub, SP, SP, Oimm 4)
+                    Sw (V0, Areg (0, SP))
+                    :: Arith (Sub, SP, SP, Oimm 4)
                 (* évalue les arguments de gauche à droite *)
-                :: List.fold_right
-                  (fun expr acc -> compile_expr expr env
-                    (Sw (V0, Areg (0, SP))
-                     :: Arith (Sub, SP, SP, Oimm 4) :: acc) )
-                  args
-                  (La (T0, "descr_general_" ^ name)
-                   :: Lw (T0, Areg(4 * (i + 1), T0) )
-                   :: Jalr T0
+                    :: List.fold_right
+                      (fun expr acc -> compile_expr expr env
+                        (Sw (V0, Areg (0, SP))
+                         :: Arith (Sub, SP, SP, Oimm 4) :: acc) )
+                      args
+                      (La (T0, "descr_general_" ^ name)
+                       :: Lw (T0, Areg(4 * (i + 1), T0) )
+                       :: Jalr T0
                    (* désalloue la place qu'occupaient les arguments *)
-                   :: Arith(Add, SP, SP, Oimm ((List.length args + 1) * 4))
+                       :: Arith(Add, SP, SP,
+                                Oimm ((List.length args + 1) * 4))
                    (* récupère la valeur de l'objet *)
-                   :: Lw (V0, Areg(0, SP) )
-                   :: acc)
-          end
+                       :: Lw (V0, Areg(0, SP) )
+                       :: acc)
+                end
+          )
         with _ -> failwith "Compilation de New"
       end
     | SPrint e -> (* prend en argument un objet de type String *)
