@@ -8,6 +8,15 @@
 \begin{document}
 \maketitle
 
+\section*{Introduction}
+
+Une remarque générale sur la réalisation de ce projet, qui se divisait en
+trois phases de travail, est que c'est lorsqu'on passe à une nouvelle phase
+que l'on se rend compte que la précédente ne convient pas.
+
+Ainsi la programmation d'un compilateur pour \textbf{Petit Java} a
+nécessité de permanents va-et-viens entre les différents morceaux du code.
+
 \section{Analyses lexicale et syntaxique}
 
 Pour tout le projet, nous avons utilisé les outils présentés en cours ;
@@ -16,8 +25,24 @@ et de menhir.
 
 Les conflits qui sont apparus, lors de la compilation des \emph{if} ou des
 expressions m'ont permis d'expérimenter deux méthodes de résolution.
-La première
+La première était de séparer chaque règle en plusieurs en utilisant les
+noms terminaux. Cela s'est avéré lourd mais efficace. Je l'ai conservé pour
+les \emph{if}. La seconde consistait en l'usage des précédences, et j'ai pu
+constater l'élégance de ce procédé. Je l'ai utilisé pour les expressions
+lorsque j'ai dû en réécrire le parsage après avoir modifié l'AST pour les
+besoins des étapes utlérieures.
 
+L'épineux problème du \emph{cast} m'a fait découvrir, à travers la manière
+que j'ai choisi pour le résoudre, tout l'intérêt de lancer ses propres
+exceptions dans le parser.
+
+Avec la méthode que nous avons adoptée pour traiter
+\emph{System.out.print}, qui consiste à le séparer des autres appels de
+méthodes dès l'analyse syntaxique, et à définir trois <<faux>> mots-clefs
+pour les trois mots en jeu, cette écriture est obligatoire. Par
+exemple, \emph{((((System)))).out.print} lève une erreur de syntaxe.
+Nous avons jugé que ce n'était pas grave, puisque de toute façon, cette
+<<méthode statique>> de \textbf{Java} était <<parachutée>>.
 
 \section{Analyse sémantique et typage}
 
@@ -56,5 +81,9 @@ La troisième passe parcourt les classes et type le corps des méthodes. Il s'ag
 \item[-] \emph{String} est incodable en Petit Java à cause de l'absence de tableau.
 \end{itemize}
 Toutefois, a posteriori, il semble qu'il aurait été plus souhaitable de les traiter le plus normalement possible. 
+
+\section{Production de code}
+
+
 
 \end{document}
