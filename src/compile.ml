@@ -453,11 +453,11 @@ let compile_program p ofile =
     Label label_debut ::
       Sw (FP, Areg(0, SP)) :: (* sauvegarde FP *)
       Arith (Sub, FP, SP, Oimm 4) :: (* initialise FP *)
-      Sw (RA, Areg(0, FP)) :: (* sauvegarde RA *)
+      Sw (RA, Areg(-4, FP)) :: (* sauvegarde RA *)
       Arith (Add, SP, FP, Oimm (frame_size - 4)) :: (* Alloue la frame *)
       body @
       [Arith (Add, SP, SP, Oimm (-frame_size + 4)); (* désalloue la frame *)
-       Lw (RA, Areg(0, SP)); (* récupère la valeur de RA *)
+       Lw (RA, Areg(-4, FP)); (* récupère la valeur de RA *)
        Arith (Add, SP, SP, Oimm 4);
        Lw (FP, Areg(0, SP)); (* et celle de FP de l'appelant *)
        Jr RA] @ acc
@@ -477,12 +477,12 @@ let compile_program p ofile =
         [Label label_retour]
     in
     Label label_debut ::
-      Arith(Sub, FP, SP, Oimm 4) :: (* initialise FP *)
-      Sw (RA, Areg(0, FP)) :: (* sauvegarde RA *)
-      Arith (Add, SP, FP, Oimm frame_size) :: (* Alloue la frame *)
+      Move(FP, SP) :: (* initialise FP *)
+      Sw (RA, Areg(-4, FP)) :: (* sauvegarde RA *)
+      Arith (Add, SP, FP, Oimm (frame_size - 4)) :: (* Alloue la frame *)
       body @
-      [Arith (Add, SP, SP, Oimm (-frame_size)); (* désalloue la frame *)
-       Lw (RA, Areg(0, FP)); (* récupère la valeur de RA *)
+      [Arith (Add, SP, SP, Oimm (-frame_size + 4)); (* désalloue la frame *)
+       Lw (RA, Areg(-4, FP)); (* récupère la valeur de RA *)
        Jr RA]
   in
 

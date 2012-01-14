@@ -5,5 +5,5 @@ class Main { public static void main (String args[]) {
 	System.out.print(b);
 	System.out.print("\n");
 	String c = a + b ;
-	System.out.print("concat réalisée");
+	System.out.print("concat realisee");
 	System.out.print(c); } }
