@@ -375,7 +375,7 @@ module  CheckInstr = struct
   let isSubType classes t1 t2 =
     match t1,t2 with
       | STypeNull,(SC foo) -> true
-      | SBool,_ | SInt,_ -> (t1 = t2)
+      | SBool,_ | SInt,_ | STypeNull,_ -> (t1 = t2)
       | (SC i1),(SC i2) when i1 = i2 -> true
       | (SC "Object"),_ -> false
       | (SC i),(SC "Object") -> true	
@@ -527,12 +527,12 @@ module  CheckInstr = struct
       else
 	{sv = SNot(e); st = SBool; sp = p }
     | Binaire(p,op,e1,e2) ->
-      let e1 = typExpr classes c env e1 in
-      let e2 = typExpr classes c env e2 in
-      begin
+        let e1 = typExpr classes c env e1 in
+        let e2 = typExpr classes c env e2 in
+        begin
 	match op with 
 	  | Eq | Neq -> 
-	    if (isSubType classes e1.st e2.st) || (isSubType classes e2.st e1.st) then
+	    if (isSubType classes e1.st e2.st) || (isSubType classes e2.st e1.st) then 
 	      { sv = SBinaire(op,e1,e2); sp = p; st = SBool }
 	    else
 	    (raise (WrongType(e2.sp,e2.st,None)))
