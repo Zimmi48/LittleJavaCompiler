@@ -77,7 +77,7 @@ let compile_program p ofile =
           | SC classe ->
             compile_expr e env (
               let pos = Cmap.find id.id_id (Cmap.find classe !classe_attrs) in
-              let pos = (pos + 2) * 4 in
+              let pos = (pos + 1) * 4 in
               Arith (Add, V0, V0, Oimm pos) :: acc )
           | _ -> failwith "Typage mal fait : n'est pas un objet."
       with Not_found -> failwith "Erreur 42"
