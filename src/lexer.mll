@@ -88,7 +88,7 @@ and string = parse
 
 and commentLine = parse
   | '\n' { newline lexbuf }
-  | _    { comment lexbuf }
+  | _    { commentLine lexbuf }
 
 and comment = parse
   | '\n' { newline lexbuf ; comment lexbuf }

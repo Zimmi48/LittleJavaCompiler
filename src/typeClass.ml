@@ -105,9 +105,11 @@ module ClassAnalysis = struct
       | Int,Bool -> -1
       | Bool,Int -> 1
       | (C c1),Bool -> 1
+      | Bool,(C _) -> -1
+      | Int,(C _) -> -1
       | (C c1),Int -> 1
       | (C c1),(C c2) -> String.compare c1 c2
-      | (_,_) -> failwith "Improbable"
+      | (_,_) -> failwith "Improbable !"
 
       
   (** vérfie l'unicité des champs et que leurs types soient bien formés
@@ -334,16 +336,25 @@ module  CheckInstr = struct
   open Sast
   open Exceptions
 
+
  (** Ordre sur les types *)
   let compTyp e1 e2 =
     match e1.st,e2.st with
       | t2,t1 when t1 = t2-> 0
       | SInt,SBool -> -1
       | SBool,SInt -> 1
+      | STypeNull,SInt -> 1
+      | STypeNull,SBool -> 1
+      | SBool,STypeNull -> -1
+      | SInt,STypeNull -> -1
+      | STypeNull,(SC _) -> -1
+      | (SC foo),STypeNull -> 1
+      | SBool,(SC _) -> -1
+      | SInt,(SC _) -> -1
       | (SC c1),SBool -> 1
       | (SC c1),SInt -> 1
       | (SC c1),(SC c2) -> String.compare c1 c2
-      | (_,_) -> failwith "Improbable"
+      | (t2,t1) ->  failwith "Improbable"
 
  (** calcule si une classe c1 hérite d'une autre classe c2 *)
   let rec isSubClass classes c1 c2 =
@@ -363,7 +374,7 @@ module  CheckInstr = struct
   (** calcul si t1 est un sous type de t2 *)
   let isSubType classes t1 t2 =
     match t1,t2 with
-      | STypeNull,_ -> true
+      | STypeNull,(SC foo) -> true
       | SBool,_ | SInt,_ -> (t1 = t2)
       | (SC i1),(SC i2) when i1 = i2 -> true
       | (SC "Object"),_ -> false
