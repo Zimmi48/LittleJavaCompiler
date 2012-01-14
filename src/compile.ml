@@ -492,7 +492,7 @@ let compile_program p ofile =
       body @
       [Arith (Add, SP, SP, Oimm (-frame_size)); (* désalloue la frame *)
        Lw (RA, Areg(-4, FP)); (* récupère la valeur de RA *)
-       Arith (Add, SP, SP, Oimm 4);
+       Arith (Add, SP, SP, Oimm 8);
        Lw (FP, Areg(0, SP)); (* et celle de FP de l'appelant *)
        Jr RA] @ acc
        (* remarque : la valeur de retour se trouve déjà dans V0 *)
