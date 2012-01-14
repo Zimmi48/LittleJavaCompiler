@@ -276,6 +276,7 @@ let compile_program p ofile =
       compile_expr e env (
         match typ with
           | STypeNull -> Arith (Mips.Eq, V0, V0, Oimm 0) :: acc
+          | SC "Object" -> Li (V0, 1) :: acc
           | SC classe ->
             Move (A0, V0)
             :: La (A1, "descr_general_" ^ classe)
@@ -290,19 +291,23 @@ let compile_program p ofile =
         :: Syscall
         :: La (T0, "descr_general_String")
         :: Sw (T0, Areg(0, V0) )
-        :: Li (T0, 0)
-        :: Sw (T0, Areg(4, V0) )
+        :: Sw (Zero, Areg(4, V0) )
         :: acc
       else begin
         try
+          let attr_pos = Cmap.find name !classe_attrs in
           (* alloc dynamique *)
           Li (V0, 9)
-          :: Li (A0, (Cmap.cardinal (Cmap.find name !classe_attrs) + 1) * 4)
+          :: Li (A0, (Cmap.cardinal attr_pos + 1) * 4)
           :: Syscall
           :: La(T0, "descr_general_" ^ name)
           :: Sw (T0, Areg(0, V0) )
-          :: begin
-            match constr with
+
+          (* inititialisation *)
+          :: Cmap.fold
+            (fun _ pos acc -> Sw (Zero, Areg((pos + 1) * 4, V0)) :: acc)
+            attr_pos
+            begin match constr with
                 None -> acc
               | Some i ->
                 (* appel du constructeur *)
