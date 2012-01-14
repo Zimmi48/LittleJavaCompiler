@@ -19,7 +19,9 @@ type instruction =
   | Li of register * int
   | La of register * string
   | Lw of register * address
+  | Lb of register * address
   | Sw of register * address
+  | Sb of register * address
   | Arith of arith * register * register * operand
   (* au sens large pour tout type d'opérateur binaire *)
   | Neg of register * register

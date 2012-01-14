@@ -572,7 +572,7 @@ let compile_program p ofile =
        Syscall;
 
        Label "String_concat" ; (* implémentation de la concaténation *)
-       Li (T0 , 4); (* on compte la nouvelle longueur *)
+       Li (T0 , 1); (* on compte la nouvelle longueur *)
        (* ne lève pas d'erreur si on essaye la concaténation avec NULL *)
        Lw (A0, Areg(4, A0)) ; (* chargement des adresses des chaînes *)
        Lw (A1, Areg(4, A1)) ;
@@ -582,17 +582,17 @@ let compile_program p ofile =
        (* pas de mise a jour de SP car pas d'appels de fcts a venir *)
        
        Label "String_concat_boucle1";
-       Lw (T1, Areg(0, A0));
+       Lb (T1, Areg(0, A0));
        Beqz (T1, "String_concat_boucle2");
-       Arith (Add, T0, T0, Oimm 4);
-       Arith (Add, A0, A0, Oimm 4);
+       Arith (Add, T0, T0, Oimm 1);
+       Arith (Add, A0, A0, Oimm 1);
        J "String_concat_boucle1";
        
        Label "String_concat_boucle2";
-       Lw (T1, Areg(0, A1));
+       Lb (T1, Areg(0, A1));
        Beqz (T1, "String_concat_allocs");
-       Arith (Add, T0, T0, Oimm 4);
-       Arith (Add, A1, A1, Oimm 4);
+       Arith (Add, T0, T0, Oimm 1);
+       Arith (Add, A1, A1, Oimm 1);
        J "String_concat_boucle2";
        
        Label "String_concat_allocs";
@@ -603,27 +603,28 @@ let compile_program p ofile =
        Move (T0, V0);
 
        (* récupération des adresses des deux chaînes *)
-       Sw (A0, Areg(0, SP));
-       Sw (A1, Areg(-4, SP));
+       Lw (A0, Areg(0, SP));
+       Lw (A1, Areg(-4, SP));
        
        (* construction de la chaîne concaténée *)
        Label "String_concat_boucle3";
-       Lw (T1, Areg(0, A0)) ;
-       Beqz (T1, "String_concat_boucle4");
-       Sw (T1, Areg(0, T0)) ; (* copie un caractère *)
-       Arith (Add, T0, T0, Oimm 4); (* position dans la nouvelle chaîne *)
-       Arith (Add, A0, A0, Oimm 4);
+       Lb (T1, Areg(0, A0)) ;
+       Beqz (T1, "String_concat_avantboucle4");
+       Sb (T1, Areg(0, T0)) ; (* copie un caractère *)
+       Arith (Add, T0, T0, Oimm 1); (* position dans la nouvelle chaîne *)
+       Arith (Add, A0, A0, Oimm 1);
        J "String_concat_boucle3";
        
-       Lw (T1, Areg(0, A1)) ; (* copie un caractère *)
-       Sw (T1, Areg(0, T0)) ;
+       Label "String_concat_avantboucle4";
+       Lb (T1, Areg(0, A1)) ; (* copie un caractère *)
+       Sb (T1, Areg(0, T0)) ;
        Label "String_concat_boucle4";
        (* on sort après avoir écrit le caractère de fin de chaîne *)
        Beqz (T1, "String_concat_allocs2");
-       Arith (Add, T0, T0, Oimm 4);
-       Arith (Add, A1, A1, Oimm 4);
-       Lw (T1, Areg(0, A1)) ; (* copie un caractère *)
-       Sw (T1, Areg(0, T0)) ;
+       Arith (Add, T0, T0, Oimm 1);
+       Arith (Add, A1, A1, Oimm 1);
+       Lb (T1, Areg(0, A1)) ; (* copie un caractère *)
+       Sb (T1, Areg(0, T0)) ;
        J "String_concat_boucle4";
        
        Label "String_concat_allocs2";
@@ -637,7 +638,7 @@ let compile_program p ofile =
       
        La(T0, "descr_general_String");
        Sw(T0, Areg(0, V0) );
-     
+       Jr RA
       (* rajouter les implémentations de concat et String_ofint *)
       ] in
   let n = Array.length p.smeths in

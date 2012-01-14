@@ -19,7 +19,9 @@ type instruction =
   | Li of register * int
   | La of register * string
   | Lw of register * address
+  | Lb of register * address
   | Sw of register * address
+  | Sb of register * address
   | Arith of arith * register * register * operand
   (* au sens large pour tout type d'opérateur binaire *)
   | Neg of register * register
@@ -88,8 +90,12 @@ let print_instruction fmt = function
     fprintf fmt "\tla   %a, %s\n" print_register r s
   | Lw (r, a) ->
     fprintf fmt "\tlw   %a, %a\n" print_register r print_address a
+  | Lb (r, a) ->
+    fprintf fmt "\tlb   %a, %a\n" print_register r print_address a
   | Sw (r, a) ->
     fprintf fmt "\tsw   %a, %a\n" print_register r print_address a
+  | Sb (r, a) ->
+    fprintf fmt "\tsb   %a, %a\n" print_register r print_address a
   | Arith (a, dst, src, op) ->
     fprintf fmt "\t%a  %a, %a, %a\n" 
       print_arith a print_register dst print_register src print_operand op
