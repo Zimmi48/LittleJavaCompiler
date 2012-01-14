@@ -486,11 +486,11 @@ let compile_program p ofile =
     in
     Label label_debut ::
       Sw (FP, Areg(0, SP)) :: (* sauvegarde FP *)
-      Arith (Sub, FP, SP, Oimm 4) :: (* initialise FP *)
+      Move (FP, SP) :: (* initialise FP *)
       Sw (RA, Areg(-4, FP)) :: (* sauvegarde RA *)
-      Arith (Add, SP, FP, Oimm (frame_size - 4)) :: (* Alloue la frame *)
+      Arith (Add, SP, FP, Oimm frame_size) :: (* Alloue la frame *)
       body @
-      [Arith (Add, SP, SP, Oimm (-frame_size + 4)); (* désalloue la frame *)
+      [Arith (Add, SP, SP, Oimm (-frame_size)); (* désalloue la frame *)
        Lw (RA, Areg(-4, FP)); (* récupère la valeur de RA *)
        Arith (Add, SP, SP, Oimm 4);
        Lw (FP, Areg(0, SP)); (* et celle de FP de l'appelant *)
