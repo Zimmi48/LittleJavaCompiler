@@ -480,8 +480,8 @@ let compile_program p ofile =
         [meth.scall_body]
         env
         label_retour
-        (-8)
-        (-8)
+        (-4)
+        (-4)
         [Label label_retour]
     in
     Label label_debut ::
@@ -506,14 +506,14 @@ let compile_program p ofile =
         [p.sinstr]
         Cmap.empty
         label_retour
-        (-8)
-        (-8)
+        (-4)
+        (-4)
         [Label label_retour]
     in
     Label label_debut ::
       Move(FP, SP) :: (* initialise FP *)
       Sw (RA, Areg(-4, FP)) :: (* sauvegarde RA *)
-      Arith (Add, SP, FP, Oimm frame_size) :: (* Alloue la frame *)
+      Arith (Add, SP, FP, Oimm frame_size ) :: (* Alloue la frame *)
       body @
       [Arith (Add, SP, SP, Oimm (-frame_size)); (* désalloue la frame *)
        Lw (RA, Areg(-4, FP)); (* récupère la valeur de RA *)

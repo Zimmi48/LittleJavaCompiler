@@ -2,7 +2,7 @@
 main:
 	move $fp, $sp
 	sw   $ra, -4($fp)
-	add  $sp, $fp, -12
+	add  $sp, $fp, -8
 	li   $v0, 9
 	li   $a0, 8
 	syscall
@@ -19,17 +19,17 @@ main:
 	jalr   $t0
 	add  $sp, $sp, 8
 	lw   $v0, 0($sp)
-	add  $t0, $fp, -12
+	add  $t0, $fp, -8
 	sw   $v0, 0($t0)
 fin_main:
-	add  $sp, $sp, 12
+	add  $sp, $sp, 8
 	lw   $ra, -4($fp)
 	jr   $ra
 debut_meth_3:
 	sw   $fp, 0($sp)
 	move $fp, $sp
 	sw   $ra, -4($fp)
-	add  $sp, $fp, -8
+	add  $sp, $fp, -4
 	add  $v0, $fp, 12
 	lw   $v0, 0($v0)
 	add  $v0, $v0, 8
@@ -54,27 +54,27 @@ debut_meth_3:
 	lw   $t0, 0($sp)
 	sw   $v0, 0($t0)
 fin_meth_3:
-	add  $sp, $sp, 8
-	lw   $ra, -4($fp)
 	add  $sp, $sp, 4
+	lw   $ra, -4($fp)
+	add  $sp, $sp, 8
 	lw   $fp, 0($sp)
 	jr   $ra
 debut_meth_2:
 	sw   $fp, 0($sp)
 	move $fp, $sp
 	sw   $ra, -4($fp)
-	add  $sp, $fp, -8
+	add  $sp, $fp, -4
 fin_meth_2:
-	add  $sp, $sp, 8
-	lw   $ra, -4($fp)
 	add  $sp, $sp, 4
+	lw   $ra, -4($fp)
+	add  $sp, $sp, 8
 	lw   $fp, 0($sp)
 	jr   $ra
 debut_meth_1:
 	sw   $fp, 0($sp)
 	move $fp, $sp
 	sw   $ra, -4($fp)
-	add  $sp, $fp, -8
+	add  $sp, $fp, -4
 	add  $v0, $fp, 12
 	lw   $v0, 0($v0)
 	add  $v0, $v0, 4
@@ -86,20 +86,20 @@ debut_meth_1:
 	lw   $t0, 0($sp)
 	sw   $v0, 0($t0)
 fin_meth_1:
-	add  $sp, $sp, 8
-	lw   $ra, -4($fp)
 	add  $sp, $sp, 4
+	lw   $ra, -4($fp)
+	add  $sp, $sp, 8
 	lw   $fp, 0($sp)
 	jr   $ra
 debut_meth_0:
 	sw   $fp, 0($sp)
 	move $fp, $sp
 	sw   $ra, -4($fp)
-	add  $sp, $fp, -8
+	add  $sp, $fp, -4
 fin_meth_0:
-	add  $sp, $sp, 8
-	lw   $ra, -4($fp)
 	add  $sp, $sp, 4
+	lw   $ra, -4($fp)
+	add  $sp, $sp, 8
 	lw   $fp, 0($sp)
 	jr   $ra
 print:
